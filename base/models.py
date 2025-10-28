@@ -26,7 +26,6 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     avatar = models.ImageField(
         upload_to=user_avatar_path,
-        default='default_images/avatar_default.png',
         blank=True,
         null=True,
         validators=[validate_image]
@@ -53,7 +52,6 @@ class School(models.Model):
     name = models.CharField(max_length=255)
     logo = models.ImageField(
         upload_to=school_logo_path,
-        default='default_images/logo_default.png',
         blank=True,
         null=True,
         validators=[validate_image]
@@ -134,7 +132,7 @@ class Instructor(models.Model):
     first_name = models.CharField(max_length=100)
     pseudonym = models.CharField(max_length=100, blank=True, null=True)
     last_name = models.CharField(max_length=100)
-    photo = models.ImageField(upload_to=instructor_image_path, default='default_images/instructor_default.png', blank=True, null=True,  validators=[validate_image])
+    photo = models.ImageField(upload_to=instructor_image_path, blank=True, null=True,  validators=[validate_image])
     styles = models.ManyToManyField(Style, related_name='instructors', blank=True)
 
     def __str__(self):
@@ -192,7 +190,7 @@ class DanceClass(models.Model):
     instructors = models.ManyToManyField(Instructor, related_name='classes', blank=True)
     level = models.ForeignKey(Level, on_delete=models.CASCADE)
     age_group = models.ForeignKey(AgeGroup, on_delete=models.CASCADE)
-    participation_form = models.ForeignKey(ParticipationForm, on_delete=models.SET_NULL, null=True, blank=True)
+    participation_form = models.ForeignKey(ParticipationForm, on_delete=models.SET_NULL, null=True, blank=True, help_text="Opcjonalnie, np. zajęcia w parach, solo, formacja")
     day_of_week = models.CharField(max_length=20, choices=DAYS_OF_WEEK, null=True, blank=True)
     starts_at = models.TimeField()
     ends_at = models.TimeField()
