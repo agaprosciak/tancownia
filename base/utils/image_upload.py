@@ -40,35 +40,37 @@ def school_image_path(instance, filename):
 #  2. GENERYCZNA FUNKCJA DO TWORZENIA WALIDATORÓW OBRAZÓW
 # ===================================================================
 
-def createImageValidator(max_size_mb=5, allowed_mime_types=None):
+def create_image_validator(max_size_mb=5, allowed_mime_types=None):
     """
-    Funkcja-fabryka, która tworzy i zwraca spersonalizowaną funkcję walidującą.
-    Pozwala na łatwe definiowanie różnych limitów rozmiaru i typów plików.
+    Funkcja-fabryka, która TWORZY i ZWRACA spersonalizowaną funkcję walidującą.
+    Działa jak maszyna, którą konfigurujesz, a ona produkuje dla Ciebie walidator.
     """
     if allowed_mime_types is None:
-        # Domyślnie dozwolone popularne formaty obrazów
         allowed_mime_types = ['image/jpeg', 'image/png', 'image/gif']
 
+    # To jest funkcja-produkt, którą fabryka tworzy.
+    # To właśnie ta funkcja będzie uruchamiana przez Django przy każdym wgraniu pliku.
     def validator(file):
-        # Krok 1: Walidacja rozmiaru pliku
+        # Ta funkcja "pamięta" wartość `max_size_mb` z momentu jej stworzenia.
         max_size_bytes = max_size_mb * 1024 * 1024
         if file.size > max_size_bytes:
             raise ValidationError(f'Plik jest zbyt duży (max {max_size_mb}MB).')
             
-        # Krok 2: Bezpieczna walidacja typu pliku (MIME type)
+        # Bezpieczna walidacja typu pliku.
         file.seek(0)
         mime_type = magic.from_buffer(file.read(1024), mime=True)
-        file.seek(0)  # Zresetuj wskaźnik pliku dla Django
+        file.seek(0)
 
         if mime_type not in allowed_mime_types:
             raise ValidationError(f'Nieprawidłowy typ pliku ({mime_type}). Dozwolone są tylko obrazy.')
 
+    # Fabryka zwraca gotowy produkt - skonfigurowaną funkcję walidującą.
     return validator
 
-# --- Predefiniowane walidatory do użycia w modelach ---
+# --- Użycie fabryki do stworzenia predefiniowanych walidatorów ---
 
-# Ogólny walidator dla większości obrazów
-validate_image = createImageValidator(max_size_mb=5)
+# "Zamawiamy" walidator o pojemności 5MB.
+validate_image = create_image_validator(max_size_mb=5)
 
-# Specjalny walidator dla awatarów z mniejszym limitem
-validate_avatar = createImageValidator(max_size_mb=2)
+# "Zamawiamy" drugi, mniejszy walidator dla awatarów.
+validate_avatar = create_image_validator(max_size_mb=2)

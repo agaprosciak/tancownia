@@ -10,7 +10,8 @@ from base.utils.image_upload import (
     school_logo_path,
     instructor_image_path,
     school_image_path,
-    validate_image
+    validate_image,
+    validate_avatar
 )
 
 
@@ -28,7 +29,7 @@ class User(AbstractUser):
         upload_to=user_avatar_path,
         blank=True,
         null=True,
-        validators=[validate_image]
+        validators=[validate_avatar]
     )
 
     USERNAME_FIELD = 'email'
