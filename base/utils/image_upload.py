@@ -2,6 +2,7 @@ import uuid
 import os
 from django.core.exceptions import ValidationError
 import magic  # Używane do bezpiecznego sprawdzania typu pliku
+from django.utils.deconstruct import deconstructible
 
 # ===================================================================
 #  1. GENERYCZNA FUNKCJA DO TWORZENIA ŚCIEŻEK
@@ -40,37 +41,35 @@ def school_image_path(instance, filename):
 #  2. GENERYCZNA FUNKCJA DO TWORZENIA WALIDATORÓW OBRAZÓW
 # ===================================================================
 
-def create_image_validator(max_size_mb=5, allowed_mime_types=None):
+@deconstructible
+class ImageValidator:
     """
-    Funkcja-fabryka, która TWORZY i ZWRACA spersonalizowaną funkcję walidującą.
-    Działa jak maszyna, którą konfigurujesz, a ona produkuje dla Ciebie walidator.
+    Konfigurowalny walidator obrazów w formie klasy.
+    Django potrafi poprawnie zapisać ("serializować") takie obiekty w migracjach.
     """
-    if allowed_mime_types is None:
-        allowed_mime_types = ['image/jpeg', 'image/png', 'image/gif']
+    def __init__(self, max_size_mb=5, allowed_mime_types=None):
+        self.max_size_mb = max_size_mb
+        if allowed_mime_types is None:
+            self.allowed_mime_types = ['image/jpeg', 'image/png', 'image/gif']
+        else:
+            self.allowed_mime_types = allowed_mime_types
 
-    # To jest funkcja-produkt, którą fabryka tworzy.
-    # To właśnie ta funkcja będzie uruchamiana przez Django przy każdym wgraniu pliku.
-    def validator(file):
-        # Ta funkcja "pamięta" wartość `max_size_mb` z momentu jej stworzenia.
-        max_size_bytes = max_size_mb * 1024 * 1024
+    def __call__(self, file):
+        """Ta metoda jest wywoływana, gdy Django używa walidatora."""
+        # Krok 1: Walidacja rozmiaru
+        max_size_bytes = self.max_size_mb * 1024 * 1024
         if file.size > max_size_bytes:
-            raise ValidationError(f'Plik jest zbyt duży (max {max_size_mb}MB).')
+            raise ValidationError(f'Plik jest zbyt duży (max {self.max_size_mb}MB).')
             
-        # Bezpieczna walidacja typu pliku.
+        # Krok 2: Bezpieczna walidacja typu pliku
         file.seek(0)
         mime_type = magic.from_buffer(file.read(1024), mime=True)
         file.seek(0)
 
-        if mime_type not in allowed_mime_types:
+        if mime_type not in self.allowed_mime_types:
             raise ValidationError(f'Nieprawidłowy typ pliku ({mime_type}). Dozwolone są tylko obrazy.')
 
-    # Fabryka zwraca gotowy produkt - skonfigurowaną funkcję walidującą.
-    return validator
+# --- Tworzenie konkretnych instancji walidatorów ---
 
-# --- Użycie fabryki do stworzenia predefiniowanych walidatorów ---
-
-# "Zamawiamy" walidator o pojemności 5MB.
-validate_image = create_image_validator(max_size_mb=5)
-
-# "Zamawiamy" drugi, mniejszy walidator dla awatarów.
-validate_avatar = create_image_validator(max_size_mb=2)
+validate_image = ImageValidator(max_size_mb=5)
+validate_avatar = ImageValidator(max_size_mb=2)
