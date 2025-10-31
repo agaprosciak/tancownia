@@ -20,20 +20,20 @@ def generate_unique_upload_path(instance, filename, upload_dir):
 # --- Konkretne funkcje upload_to używane w modelach ---
 
 def user_avatar_path(instance, filename):
-    return generate_unique_upload_path(instance, filename, "user_images/avatars")
+    return generate_unique_upload_path(instance, filename, "users")
 
 def school_logo_path(instance, filename):
-    return generate_unique_upload_path(instance, filename, "schools_images/logos")
+    return generate_unique_upload_path(instance, filename, "schools/logos")
 
 def instructor_image_path(instance, filename):
-    return generate_unique_upload_path(instance, filename, "instructor_images/photos")
+    return generate_unique_upload_path(instance, filename, "instructors")
 
 def school_image_path(instance, filename):
     """
     Tworzy podfolder dla galerii szkoły, nawet jeśli szkoła nie jest jeszcze zapisana.
     """
     school_id_or_new = instance.school.id if instance.school and instance.school.id else "new_school"
-    upload_dir = f"schools_images/{school_id_or_new}/gallery"
+    upload_dir = f"schools/{school_id_or_new}"
     return generate_unique_upload_path(instance, filename, upload_dir)
 
 

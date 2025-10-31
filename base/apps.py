@@ -8,3 +8,4 @@ class BaseConfig(AppConfig):
         # Importujemy signals dopiero po załadowaniu modeli
         import base.signals.image_signals
         import base.signals.styles_signals
+        import base.signals.rating_signals
