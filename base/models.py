@@ -129,7 +129,7 @@ class Review(models.Model):
 
 
 class Instructor(models.Model):
-    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='instructors')
+    schools = models.ManyToManyField(School, related_name='instructors')
     first_name = models.CharField(max_length=100)
     pseudonym = models.CharField(max_length=100, blank=True, null=True)
     last_name = models.CharField(max_length=100)
@@ -192,12 +192,19 @@ class DanceClass(models.Model):
     level = models.ForeignKey(Level, on_delete=models.CASCADE)
     age_group = models.ForeignKey(AgeGroup, on_delete=models.CASCADE)
     participation_form = models.ForeignKey(ParticipationForm, on_delete=models.SET_NULL, null=True, blank=True, help_text="Opcjonalnie, np. zajęcia w parach, solo, formacja")
-    day_of_week = models.CharField(max_length=20, choices=DAYS_OF_WEEK, null=True, blank=True)
+    
+    # ZMIANA: day_of_week jest wymagane w bazie (brak null=True), ale opcjonalne w formularzu (blank=True)
+    # ponieważ uzupełniamy je automatycznie w save()
+    day_of_week = models.CharField(max_length=20, choices=DAYS_OF_WEEK, blank=True)
+    
     starts_at = models.TimeField()
     ends_at = models.TimeField()
     floor = models.ForeignKey(DanceFloor, on_delete=models.SET_NULL, null=True, blank=True)
     description = models.TextField(blank=True, null=True)
-    first_class_date = models.DateField(null=True, blank=True)
+    
+    # first_class_date jest teraz BEZWZGLĘDNIE OBOWIĄZKOWE
+    first_class_date = models.DateField()
+    
     can_join = models.BooleanField(default=True)
     periodic = models.BooleanField(default=True)
     price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
@@ -207,21 +214,64 @@ class DanceClass(models.Model):
     def __str__(self):
         return f"{self.style.style_name} ({self.school.name})"
     
+    def save(self, *args, **kwargs):
+        # AUTOMATYCZNE USTAWIANIE DNIA TYGODNIA
+        # Działa zawsze, gdy podana jest data (a teraz jest ona obowiązkowa)
+        if self.first_class_date:
+            days_keys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+            day_index = self.first_class_date.weekday()
+            self.day_of_week = days_keys[day_index]
+
+        super().save(*args, **kwargs)
+
     def clean(self):
-        #Walidacja logiki biznesowej przed zapisem.
         super().clean()
         
-        # Walidacja czasu (Problem 1)
+        # 1. Walidacja czasu (Start < Koniec)
         if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
             raise ValidationError(
                 {'ends_at': "Czas zakończenia zajęć musi być późniejszy niż czas rozpoczęcia."}
             )
             
-        # Walidacja dla zajęć cyklicznych
-        if self.periodic and not self.day_of_week:
-             raise ValidationError(
-                {'day_of_week': "Dzień tygodnia jest wymagany dla zajęć cyklicznych."}
+        # ====================================================
+        # 2. WALIDACJA KOLIZJI SALI (Double Booking)
+        # ====================================================
+        
+        # Sprawdzamy tylko, jeśli zdefiniowano salę i godziny
+        if self.floor and self.starts_at and self.ends_at and self.first_class_date:
+            
+            # Musimy ustalić, jaki to dzień tygodnia, żeby sprawdzić kolizje.
+            # W clean() save() jeszcze nie zadziałał, więc musimy to wyliczyć "na brudno" tutaj.
+            days_keys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+            current_day_of_week = days_keys[self.first_class_date.weekday()]
+
+            # Szukamy konfliktów
+            conflicting_classes = DanceClass.objects.filter(
+                school=self.school,     # Ta sama szkoła
+                floor=self.floor,       # Ta sama sala
+                day_of_week=current_day_of_week # Ten sam dzień tygodnia (cyklicznie)
             )
+
+            # Wykluczamy "samego siebie" przy edycji
+            if self.pk:
+                conflicting_classes = conflicting_classes.exclude(pk=self.pk)
+
+            # Sprawdzamy nakładanie się godzin
+            # (Nowy start < Stary koniec) ORAZ (Nowy koniec > Stary start)
+            conflicting_classes = conflicting_classes.filter(
+                starts_at__lt=self.ends_at,
+                ends_at__gt=self.starts_at
+            )
+
+            if conflicting_classes.exists():
+                conflict = conflicting_classes.first()
+                raise ValidationError({
+                    'starts_at': (
+                        f"Kolizja! W sali '{self.floor.name}' w {self.get_day_of_week_display()} "
+                        f"odbywają się już zajęcia: {conflict.style.style_name} "
+                        f"({conflict.starts_at.strftime('%H:%M')} - {conflict.ends_at.strftime('%H:%M')})."
+                    )
+                })
 
 
 
