@@ -7,15 +7,14 @@ from .models import (
 
 # --- KLUCZOWA ZMIANA DLA USERA ---
 class CustomUserAdmin(UserAdmin):
-    # To sprawia, że w widoku EDYCJI (po wejściu w usera) widzisz swoje pola
+    # Dodaliśmy przecinek po 'role'
     fieldsets = UserAdmin.fieldsets + (
-        ('Dodatkowe Informacje', {'fields': ('role', 'avatar')}),
+        ('Dodatkowe Informacje', {'fields': ('role',)}), 
     )
     
-    # To sprawia, że w widoku TWORZENIA (Add User) też możesz je dodać
-    # (chociaż standardowo Django najpierw każe podać hasło, a potem resztę)
+    # Tutaj przy dwóch polach ('role', 'email') jest już OK
     add_fieldsets = UserAdmin.add_fieldsets + (
-        ('Dodatkowe Informacje', {'fields': ('role', 'avatar', 'email')}),
+        ('Dodatkowe Informacje', {'fields': ('role', 'email')}),
     )
 
 # Rejestrujemy Usera ZE SPECJALNĄ KONFIGURACJĄ
