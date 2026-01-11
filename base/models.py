@@ -3,15 +3,15 @@ from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
+import datetime
+from django.db.models import Q 
 
 
 from base.utils.image_upload import (
-    user_avatar_path,
     school_logo_path,
     instructor_image_path,
     school_image_path,
     validate_image,
-    validate_avatar
 )
 
 
@@ -25,12 +25,6 @@ class User(AbstractUser):
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user')
     email = models.EmailField(unique=True)
-    avatar = models.ImageField(
-        upload_to=user_avatar_path,
-        blank=True,
-        null=True,
-        validators=[validate_avatar]
-    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
@@ -74,10 +68,40 @@ class School(models.Model):
     full_address = models.CharField(max_length=255,blank=True)
 
     styles = models.ManyToManyField('Style', related_name='schools', blank=True)
-    description = models.TextField()
-    important_info = models.TextField(blank=True, null=True)
-    rules = models.TextField(blank=True, null=True)
-    default_registration_info_link = models.TextField(blank=True, null=True)
+    description = models.TextField(help_text="Opisz klimat swojego studia, co Was wyróżnia oraz najważniejsze informacje. To tekst, który ma przekonać kursanta, że to miejsce właśnie dla niego!")
+    rules = models.TextField(blank=True, null=True, help_text="Link/i lub tekst. Możesz wkleić tutaj m.in. zasady uczestnictwa w zajęciach, regulamin płatności oraz obowiązujące w szkole Standardy Ochrony Małoletnich.")
+    default_registration_info_link = models.TextField(blank=True, null=True, help_text="Wklej tutaj link do Twojego systemu/formularza zapisów lub napisz informacje o sposobie zapisów na zajęcia. Link lub informacje zostaną automatycznie dodany do każdych nowych zajęć (będziesz mógł go zmienić przy konkretnym kursie).")
+    news = models.TextField(
+        blank=True, 
+        null=True, 
+        verbose_name="Aktualności",
+        help_text="Wpisz tu ważne komunikaty (np. 'W Wigilię nieczynne'). Ten tekst wyświetli się na profilu szkoły."
+    )
+
+    accepts_multisport = models.BooleanField(
+        default=False, 
+        verbose_name="Akceptujemy MultiSport"
+    )
+    accepts_medicover = models.BooleanField(
+        default=False, 
+        verbose_name="Akceptujemy Medicover Sport (OK System)"
+    )
+    accepts_fitprofit = models.BooleanField(
+        default=False, 
+        verbose_name="Akceptujemy FitProfit"
+    )
+    accepts_pzu_sport = models.BooleanField(
+        default=False, 
+        verbose_name="Akceptujemy PZU Sport"
+    )
+
+    # Pole na dodatkowe info (np. "Wymagana kaucja 50 zł", "Dopłata 10 zł")
+    benefit_cards_info = models.TextField(
+        blank=True, 
+        null=True, 
+        verbose_name="Informacje o kartach (dopłaty, kaucje)",
+        help_text="Tutaj wpisz informacje o ewentualnych dopłatach do kart lub kaucjach zwrotnych."
+    )
 
     average_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -92,21 +116,28 @@ class School(models.Model):
 
 class SchoolImage(models.Model):
     school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='images')
-    image = models.ImageField(upload_to=school_image_path, validators=[validate_image])
+    image = models.ImageField(upload_to=school_image_path, validators=[validate_image], help_text="Pokaż klimat swojego miejsca, sale, recepcję, szatnie. Możesz dodać maksymalnie 9 zdjęć (najlepiej w orientacji poziomej).")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.school.name} - {self.id}"
 
 class PriceList(models.Model):
+    ENTRY_TYPE_CHOICES = [
+        ('pass', 'Karnet'),
+        ('single', '1 wejście'),
+    ]
+
     school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='price_list')
-    class_duration = models.CharField(max_length=50)
     name = models.CharField(max_length=100)
-    description = models.TextField()
     price = models.DecimalField(max_digits=8, decimal_places=2)
+    entry_type = models.CharField(max_length=10, choices=ENTRY_TYPE_CHOICES, default='pass')
+    duration_minutes = models.PositiveIntegerField(blank=True, null=True, help_text="Czas trwania zajęć w minutach")
+    entries_per_week = models.PositiveIntegerField(blank=True, null=True, help_text="Ilość wejść w tygodniu (dla karnetów)")
+    description = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.school.name} - {self.name}"
+        return f"{self.school.name} - {self.name} ({self.get_entry_type_display()})"
 
 
 
@@ -133,37 +164,25 @@ class Instructor(models.Model):
     first_name = models.CharField(max_length=100)
     pseudonym = models.CharField(max_length=100, blank=True, null=True)
     last_name = models.CharField(max_length=100)
-    photo = models.ImageField(upload_to=instructor_image_path, blank=True, null=True,  validators=[validate_image])
+    photo = models.ImageField(
+        upload_to=instructor_image_path, 
+        blank=True, 
+        null=True, 
+        validators=[validate_image]
+    )
     styles = models.ManyToManyField(Style, related_name='instructors', blank=True)
+    instagram = models.URLField(blank=True, null=True, verbose_name="Instagram URL")
+    facebook = models.URLField(blank=True, null=True, verbose_name="Facebook URL")
+    
 
-    def __str__(self):
-        display_name = f"{self.first_name} {self.last_name}"
-        if self.pseudonym:
-            display_name += f" ({self.pseudonym})"
-        return display_name
+    created_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='created_instructors'
+    )
 
-
-
-
-class Level(models.Model):
-    level = models.CharField(max_length=50, unique=True)
-
-    def __str__(self):
-        return self.level
-
-
-class AgeGroup(models.Model):
-    age = models.CharField(max_length=50, unique=True)
-
-    def __str__(self):
-        return self.age
-
-
-class ParticipationForm(models.Model):
-    participation_form = models.CharField(max_length=100, unique=True)
-
-    def __str__(self):
-        return self.participation_form
 
 class DanceFloor(models.Model):
     school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='floors')
@@ -171,8 +190,6 @@ class DanceFloor(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.school.name})"
-
-
 
 
 class DanceClass(models.Model):
@@ -186,151 +203,161 @@ class DanceClass(models.Model):
         ('sunday', 'Niedziela'),
     ]
 
-    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='classes')
-    style = models.ForeignKey(Style, on_delete=models.CASCADE, related_name='classes')
-    instructors = models.ManyToManyField(Instructor, related_name='classes', blank=True)
-    level = models.ForeignKey(Level, on_delete=models.CASCADE)
-    age_group = models.ForeignKey(AgeGroup, on_delete=models.CASCADE)
-    participation_form = models.ForeignKey(ParticipationForm, on_delete=models.SET_NULL, null=True, blank=True, help_text="Opcjonalnie, np. zajęcia w parach, solo, formacja")
+    LEVEL_CHOICES = [
+        ('BEGINNER', 'Od podstaw'),
+        ('BASIC', 'Początkujący'),
+        ('INTERMEDIATE', 'Średniozaawansowany'),
+        ('ADVANCED', 'Zaawansowany'),
+        ('PRO', 'Profesjonalny'),
+        ('OPEN', 'Open (dla każdego)'),
+    ]
+
+    GROUP_TYPE_CHOICES =  [
+        ('FORMATION', 'Formacja'),
+        ('PROJECT', 'Grupa zamknięta'),
+        ('DANCE_CONTEST', 'Grupa turniejowa'),
+        ('VIDEO_PROJECT', 'Video projekt')
+    ]
+
+    school = models.ForeignKey('School', on_delete=models.CASCADE, related_name='classes')
+    style = models.ForeignKey('Style', on_delete=models.CASCADE, related_name='classes')
     
-    # ZMIANA: day_of_week jest wymagane w bazie (brak null=True), ale opcjonalne w formularzu (blank=True)
-    # ponieważ uzupełniamy je automatycznie w save()
+    subtitle = models.CharField(
+        max_length=100, 
+        blank=True, 
+        null=True,
+        verbose_name="Temat / Dopisek",
+        help_text="Opcjonalnie: doprecyzuj temat, np. 'Footwork', 'Musicality', 'Technika obrotów'."
+    )
+    
+    instructors = models.ManyToManyField('Instructor', related_name='classes', blank=True)
+    
+    level = models.CharField(
+        max_length=20, # Zwiększyłem lekko zapasowo
+        choices=LEVEL_CHOICES, 
+        default='OPEN',
+        verbose_name="Poziom zaawansowania"
+    )
+    
+    group_type = models.CharField(
+        max_length=20, 
+        choices=GROUP_TYPE_CHOICES, 
+        null=True,   
+        blank=True, 
+        verbose_name="Specyfika grupy (opcjonalne)"
+    )
+
+    # === WIEK ===
+    min_age = models.PositiveIntegerField(
+        verbose_name="Wiek od (lat)",
+        help_text="Minimalny wiek uczestnika."
+    )
+
+    max_age = models.PositiveIntegerField(
+        null=True, 
+        blank=True, 
+        verbose_name="Wiek do (lat)",
+        help_text="Zostaw puste, jeśli grupa nie ma górnej granicy (np. dla grupy 16+ lub dorosłych)."
+    )
+    
+    # === TERMINARZ ===
+    # Zawsze uzupełniany w save na podstawie daty startu
     day_of_week = models.CharField(max_length=20, choices=DAYS_OF_WEEK, blank=True)
     
-    starts_at = models.TimeField()
-    ends_at = models.TimeField()
-    floor = models.ForeignKey(DanceFloor, on_delete=models.SET_NULL, null=True, blank=True)
+    starts_at = models.TimeField(verbose_name="Godzina startu")
+    ends_at = models.TimeField(verbose_name="Godzina końca", help_text="W przypadku wydarzeń kilkudniowych: wpisz godzinę zakończenia CAŁEGO wydarzenia w ostatnim dniu jego trwania")
+    
+    floor = models.ForeignKey('DanceFloor', on_delete=models.SET_NULL, null=True, blank=True)
     description = models.TextField(blank=True, null=True)
+    periodic = models.BooleanField(default=True, verbose_name="Zajęcia cykliczne")
     
-    # first_class_date jest teraz BEZWZGLĘDNIE OBOWIĄZKOWE
-    first_class_date = models.DateField()
+    first_class_date = models.DateField(verbose_name="Data startu")
+    last_class_date = models.DateField(null=True, blank=True, verbose_name="Data końca")
     
-    can_join = models.BooleanField(default=True)
-    periodic = models.BooleanField(default=True)
+    can_join = models.BooleanField(default=True, help_text="Odznacz to pole, jeśli grupa jest już pełna lub zakończyły się do niej zapisy.")
     price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
-    registration_info_link = models.TextField(blank=True, null=True)
+    registration_info_link = models.TextField(blank=True, null=True, help_text="Link do zapisów lub instrukcja.")
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.style.style_name} ({self.school.name})"
+        return f"{self.style} ({self.day_of_week} {self.starts_at})"
     
     def save(self, *args, **kwargs):
-        # AUTOMATYCZNE USTAWIANIE DNIA TYGODNIA
-        # Działa zawsze, gdy podana jest data (a teraz jest ona obowiązkowa)
+        # 1. Automat Dnia Tygodnia (zawsze na podstawie daty startu)
         if self.first_class_date:
             days_keys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-            day_index = self.first_class_date.weekday()
-            self.day_of_week = days_keys[day_index]
+            self.day_of_week = days_keys[self.first_class_date.weekday()]
+
+        # 2. Automat Daty Końca (Żeby event jednodniowy miał datę końca = data startu)
+        if not self.last_class_date:
+            self.last_class_date = self.first_class_date
 
         super().save(*args, **kwargs)
 
     def clean(self):
         super().clean()
         
-        # 1. Walidacja czasu (Start < Koniec)
-        if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
-            raise ValidationError(
-                {'ends_at': "Czas zakończenia zajęć musi być późniejszy niż czas rozpoczęcia."}
-            )
+        # Ustalmy faktyczną datę końca do walidacji (bo w formularzu może być pusta, wtedy bierzemy start)
+        effective_end_date = self.last_class_date if self.last_class_date else self.first_class_date
+
+        # 1. Walidacja Daty (Koniec nie może być w przeszłości względem startu)
+        if effective_end_date < self.first_class_date:
+             raise ValidationError({'last_class_date': "Data zakończenia nie może być wcześniejsza niż data startu."})
+
+        # 2. Walidacja Godzin
+        # Sprawdzamy "Start < Koniec" TYLKO, jeśli to ten sam dzień.
+        if effective_end_date == self.first_class_date:
+            if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
+                raise ValidationError({'ends_at': "Godzina zakończenia musi być późniejsza niż startu (dla wydarzeń w tym samym dniu)."})
             
         # ====================================================
-        # 2. WALIDACJA KOLIZJI SALI (Double Booking)
+        # 3. WALIDACJA KOLIZJI (Sprawdzamy czy sala jest wolna)
         # ====================================================
         
-        # Sprawdzamy tylko, jeśli zdefiniowano salę i godziny
         if self.floor and self.starts_at and self.ends_at and self.first_class_date:
+            # Pobieramy inne zajęcia w tej sali
+            conflicting = DanceClass.objects.filter(school=self.school, floor=self.floor)
             
-            # Musimy ustalić, jaki to dzień tygodnia, żeby sprawdzić kolizje.
-            # W clean() save() jeszcze nie zadziałał, więc musimy to wyliczyć "na brudno" tutaj.
-            days_keys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-            current_day_of_week = days_keys[self.first_class_date.weekday()]
-
-            # Szukamy konfliktów
-            conflicting_classes = DanceClass.objects.filter(
-                school=self.school,     # Ta sama szkoła
-                floor=self.floor,       # Ta sama sala
-                day_of_week=current_day_of_week # Ten sam dzień tygodnia (cyklicznie)
-            )
-
-            # Wykluczamy "samego siebie" przy edycji
+            # Jeśli edytujemy istniejące zajęcia, wykluczamy "samego siebie" z porównania
             if self.pk:
-                conflicting_classes = conflicting_classes.exclude(pk=self.pk)
+                conflicting = conflicting.exclude(pk=self.pk)
 
-            # Sprawdzamy nakładanie się godzin
-            # (Nowy start < Stary koniec) ORAZ (Nowy koniec > Stary start)
-            conflicting_classes = conflicting_classes.filter(
-                starts_at__lt=self.ends_at,
-                ends_at__gt=self.starts_at
-            )
+            # Tworzymy pełne znaczniki czasu (datetime) dla precyzji tego konkretnego rekordu
+            my_start_dt = datetime.datetime.combine(self.first_class_date, self.starts_at)
+            my_end_dt = datetime.datetime.combine(effective_end_date, self.ends_at)
 
-            if conflicting_classes.exists():
-                conflict = conflicting_classes.first()
+            collision_found = None
+
+            for event in conflicting:
+                # Ustalamy daty dla sprawdzanego eventu z bazy
+                event_end_date = event.last_class_date if event.last_class_date else event.first_class_date
+                
+                # --- LOGIKA KOLIZJI ---
+                
+                # PRZYPADEK A: Oba są wydarzeniami jednorazowymi/wielodniowymi (periodic=False)
+                # Np. Warsztat vs Warsztat -> Sprawdzamy czy zakresy dat i godzin na siebie nachodzą
+                if not self.periodic and not event.periodic:
+                    event_start_dt = datetime.datetime.combine(event.first_class_date, event.starts_at)
+                    event_end_dt = datetime.datetime.combine(event_end_date, event.ends_at)
+                    
+                    # Matematyka: (Start A < Koniec B) ORAZ (Koniec A > Start B)
+                    if my_start_dt < event_end_dt and my_end_dt > event_start_dt:
+                        collision_found = event
+                        break
+
+                # PRZYPADEK B: Kolizja z zajęciami cyklicznymi (periodic=True)
+                # Sprawdzamy czy Dzień Tygodnia i Godziny się pokrywają.
+                elif self.periodic or event.periodic:
+                    # Sprawdzamy czy dni tygodnia są te same
+                    if self.day_of_week == event.day_of_week:
+                         if self.starts_at < event.ends_at and self.ends_at > event.starts_at:
+                             collision_found = event
+                             break
+
+            if collision_found:
                 raise ValidationError({
                     'starts_at': (
-                        f"Kolizja! W sali '{self.floor.name}' w {self.get_day_of_week_display()} "
-                        f"odbywają się już zajęcia: {conflict.style.style_name} "
-                        f"({conflict.starts_at.strftime('%H:%M')} - {conflict.ends_at.strftime('%H:%M')})."
+                        f"Kolizja! W sali '{self.floor.name}' odbywa się wtedy: {collision_found.style}."
                     )
                 })
-
-
-
-class ClassCancellation(models.Model):
-    #Model reprezentujący jednorazowe odwołanie zajęć w konkretnym dniu.
-    dance_class = models.ForeignKey(
-        DanceClass, 
-        on_delete=models.CASCADE, 
-        related_name='cancellations',
-        help_text="Wybierz zajęcia, które chcesz odwołać."
-    )
-    date = models.DateField(
-        help_text="Konkretna data, w której zajęcia się nie odbędą."
-    )
-    reason = models.CharField(
-        max_length=255, 
-        blank=True, 
-        null=True,
-        help_text="Opcjonalny powód odwołania (np. 'Święto')."
-    )
-    cancelled = models.BooleanField(
-        default=True,
-        help_text="Zaznaczone oznacza, że zajęcia są odwołane. Odznacz, aby przywrócić zajęcia w tym terminie."
-    )
-    
-    class Meta:
-        unique_together = ('dance_class', 'date')
-        ordering = ['date']
-
-    def __str__(self):
-        status = "Odwołane" if self.cancelled else "Przywrócone"
-        return f"{status}: {self.dance_class.style.style_name} w dniu {self.date}"
-
-    def clean(self):
-        #Walidacja logiki biznesowej przed zapisem.
-        super().clean()
-
-        # 1. Sprawdź, czy data odwołania nie jest w przeszłości
-        if self.date < timezone.now().date():
-            raise ValidationError("Nie można odwołać zajęć z przeszłości.")
-            
-        # 2. Dla zajęć cyklicznych, sprawdź czy dzień tygodnia się zgadza
-        if self.dance_class and self.dance_class.periodic:
-            # mapowanie wartości z modelu na standard weekday() (poniedziałek=0)
-            day_map = {name: i for i, (name, _) in enumerate(DanceClass.DAYS_OF_WEEK)}
-            expected_weekday = day_map.get(self.dance_class.day_of_week)
-            
-            if self.date.weekday() != expected_weekday:
-                raise ValidationError(
-                    f"Te zajęcia odbywają się w {self.dance_class.get_day_of_week_display()}. "
-                    f"Nie można ich odwołać w dniu {self.date.strftime('%A')}."
-                )
-            
-        # 3. Dla zajęć jednorazowych, sprawdź czy data odwołania jest taka sama
-        if self.dance_class and not self.dance_class.periodic:
-            if self.dance_class.first_class_date != self.date:
-                raise ValidationError(
-                    "Datę odwołania dla zajęć jednorazowych musi być taka sama "
-                    f"jak data tych zajęć ({self.dance_class.first_class_date})."
-                )
-
-

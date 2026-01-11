@@ -1,10 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .models import (
-    User,  # Twój model
-    Style, School, SchoolImage, PriceList, Review,
-    Instructor, Level, AgeGroup, ParticipationForm,
-    DanceFloor, DanceClass, ClassCancellation,
+    User, Style, School, SchoolImage, PriceList, Review,
+    Instructor, DanceFloor, DanceClass
 )
 
 # --- KLUCZOWA ZMIANA DLA USERA ---
@@ -30,9 +28,5 @@ admin.site.register(SchoolImage)
 admin.site.register(PriceList)
 admin.site.register(Review)
 admin.site.register(Instructor)
-admin.site.register(Level)
-admin.site.register(AgeGroup)
-admin.site.register(ParticipationForm)
 admin.site.register(DanceFloor)
 admin.site.register(DanceClass)
-admin.site.register(ClassCancellation)

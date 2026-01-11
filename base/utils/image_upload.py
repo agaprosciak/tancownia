@@ -19,9 +19,6 @@ def generate_unique_upload_path(instance, filename, upload_dir):
 
 # --- Konkretne funkcje upload_to używane w modelach ---
 
-def user_avatar_path(instance, filename):
-    return generate_unique_upload_path(instance, filename, "users")
-
 def school_logo_path(instance, filename):
     return generate_unique_upload_path(instance, filename, "schools/logos")
 
@@ -72,4 +69,3 @@ class ImageValidator:
 # --- Tworzenie konkretnych instancji walidatorów ---
 
 validate_image = ImageValidator(max_size_mb=5)
-validate_avatar = ImageValidator(max_size_mb=2)
