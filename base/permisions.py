@@ -18,8 +18,6 @@ class IsCreatorAndEmploysOrAdminOrReadOnly(permissions.BasePermission):
 
         # 3. Sprawdzamy Twórcę
         if obj.created_by == request.user:
-            # Sprawdzamy, czy użytkownik (szkoła) ma tego instruktora u siebie w relacji 'schools'
-            # Zakładając, że User ma relację 1:1 ze School
             if hasattr(request.user, 'school'):
                 is_employed = obj.schools.filter(pk=request.user.school.pk).exists()
                 return is_employed
