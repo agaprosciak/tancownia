@@ -7,27 +7,40 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        # Dodajemy rolę użytkownika do tokena, żeby React od razu wiedział, co pokazać
+
+        # DODAJEMY DANE DO TOKENA (to co przeczyta jwtDecode)
+        token['username'] = user.username
         token['role'] = user.role
+        token['has_school'] = hasattr(user, 'school') # Sprawdza czy ma szkołę
+
         return token
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=8) # Hasło tylko do zapisu
-
     class Meta:
         model = User
-        fields = ['email', 'username', 'password', 'role'] # Pola z Twoich makiet SignUp
+        # MUSISZ dodać 'role' tutaj, inaczej Django powie: "Co ty mi tu wysyłasz?"
+        fields = ('username', 'email', 'password', 'role') 
+        extra_kwargs = {'password': {'write_only': True}}
+    
+    def validate_role(self, value):
+    # Pozwalamy na rejestrację tylko tancerzy i właścicieli
+    # Wykluczamy 'admin', żeby nikt sam sobie nie nadał uprawnień przez API
+        allowed_public_roles = ['user', 'owner']
+        if value not in allowed_public_roles:
+            raise serializers.ValidationError("Nie masz uprawnień, by nadać sobie taką rolę.")
+        return value
 
     def create(self, validated_data):
-        # Używamy create_user, żeby Django automatycznie zahaszowało hasło przed zapisem
+        # Wyciągamy rolę, jeśli jej nie ma, dajemy 'user'
+        role = validated_data.pop('role', 'user')
+        
         user = User.objects.create_user(
-            email=validated_data['email'],
             username=validated_data['username'],
+            email=validated_data['email'],
             password=validated_data['password'],
-            role=validated_data.get('role', 'user') # Domyślnie tancerz, jeśli nie podano inaczej
+            role=role  # Przypisujemy rolę do modelu
         )
         return user
-    
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:

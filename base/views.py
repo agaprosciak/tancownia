@@ -1,7 +1,10 @@
 from django_filters import rest_framework as dj_filters
-from rest_framework import viewsets, filters, generics
+from rest_framework import viewsets, filters, generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly, IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.response import Response
 
 # UZUPEŁNIONE IMPORTY MODELI
 from .models import School, DanceClass, Style, Instructor, Review, User
@@ -13,7 +16,8 @@ from .serializers import (
     StyleSerializer, 
     InstructorSerializer,
     ReviewSerializer, 
-    RegisterSerializer
+    RegisterSerializer,
+    MyTokenObtainPairSerializer
 )
 
 # Definiujemy zaawansowany filtr dla wyszukiwarki
@@ -92,3 +96,26 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
     serializer_class = RegisterSerializer
     queryset = User.objects.all()
+
+    def create(self, request, *args, **kwargs):
+        # 1. Wywołujemy standardowe tworzenie usera przez serializer
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        # 2. Generujemy tokeny ręcznie dla nowo stworzonego usera
+        refresh = RefreshToken.for_user(user)
+        
+        # 3. Przygotowujemy paczkę danych dla Reacta
+        # To są te same dane, których Twój AuthContext szuka przy logowaniu
+        return Response({
+            "user": serializer.data, # dane usera (id, email itp.)
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "username": user.username,
+            "role": user.role,
+            "has_school": False # Nowy owner na starcie nigdy nie ma szkoły
+        }, status=status.HTTP_201_CREATED)
+
+class MyTokenObtainPairView(TokenObtainPairView):
+    serializer_class = MyTokenObtainPairSerializer

@@ -5,20 +5,20 @@ from .views import (
     DanceClassViewSet, 
     StyleViewSet, 
     InstructorViewSet,
-    ReviewViewSet
+    ReviewViewSet,
+    RegisterView  # <--- 1. MUSISZ TO ZAIMPORTOWAĆ
 )
 
-# Router to automat, który sam tworzy ścieżki na podstawie ViewSetów
 router = DefaultRouter()
-
-# Rejestrujemy nasze "centra dowodzenia"
 router.register(r'schools', SchoolViewSet, basename='school')
 router.register(r'classes', DanceClassViewSet, basename='danceclass')
 router.register(r'styles', StyleViewSet, basename='style')
 router.register(r'instructors', InstructorViewSet, basename='instructor')
 router.register(r'reviews', ReviewViewSet, basename='review')
+
 urlpatterns = [
-    # Wszystkie adresy będą zaczynać się od pustego ciągu, 
-    # np. /api/schools/, /api/classes/ itp.
+    # 2. DODAJEMY REJESTRACJĘ TUTAJ
+    path('register/', RegisterView.as_view(), name='register'),
+    
     path('', include(router.urls)),
 ]

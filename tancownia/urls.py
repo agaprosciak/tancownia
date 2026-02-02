@@ -2,23 +2,22 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+from rest_framework_simplejwt.views import TokenRefreshView
+# 1. Importujesz swój nowy widok z aplikacji base
+from base.views import MyTokenObtainPairView 
 
 urlpatterns = [
-    # 1. Panel administratora (musisz go mieć!)
     path('admin/', admin.site.urls),
 
-    # 2. Twoje widoki API (szkoły, zajęcia, instruktorzy)
+    # Twoje widoki API (szkoły, zajęcia itd.)
     path('api/', include('base.urls')), 
 
-    # 3. Logowanie JWT - pobieranie i odświeżanie tokenów
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    # 2. PODMIENIASZ TokenObtainPairView na swój własny MyTokenObtainPairView
+    path('api/token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    
+    # Odświeżanie tokena może zostać standardowe
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
 
-# Obsługa zdjęć w trybie deweloperskim
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
