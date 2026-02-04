@@ -92,15 +92,30 @@ class DanceClassSerializer(serializers.ModelSerializer):
         return data
 
 class SchoolSerializer(serializers.ModelSerializer):
-    # Zagnieżdżamy relacje, żeby React dostał komplet danych na raz
     images = SchoolImageSerializer(many=True, read_only=True)
     floors = DanceFloorSerializer(many=True, read_only=True)
     instructors = InstructorSerializer(many=True, read_only=True)
+    price_list = PriceListSerializer(many=True, read_only=True)
     styles = StyleSerializer(many=True, read_only=True)
+
+    average_rating = serializers.DecimalField(max_digits=3, decimal_places=2, read_only=True)
+    full_address = serializers.CharField(read_only=True)
 
     class Meta:
         model = School
-        fields = '__all__'
+        fields = [
+            'id', 'user', 'name', 'logo', 'email', 'phone', 'website', 
+            'instagram', 'facebook', 'street', 'build_no', 'postal_code', 
+            'city', 'description', 'rules', 'default_registration_info_link',
+            'news', 'accepts_multisport', 'accepts_medicover', 'accepts_fitprofit', 
+            'accepts_pzu_sport', 'benefit_cards_info', 'images', 'floors', 
+            'instructors', 'price_list', 'styles', 'average_rating', 'full_address',
+            'latitude', 'longitude', 'state', 'county' 
+        ]
+        
+        read_only_fields = ['id', 'user', 'average_rating', 'full_address']
+        
+
 
 class ReviewSerializer(serializers.ModelSerializer):
     username = serializers.ReadOnlyField(source='user.username')
@@ -109,3 +124,4 @@ class ReviewSerializer(serializers.ModelSerializer):
         model = Review
         fields = ['id', 'school', 'user', 'username', 'rating', 'description', 'created_at']
         read_only_fields = ['user']
+

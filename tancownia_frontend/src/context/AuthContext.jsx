@@ -26,18 +26,27 @@ export const AuthProvider = ({ children }) => {
     const [message, setMessage] = useState(null); 
     const navigate = useNavigate();
 
-    const registerUser = async (formData) => {
+   const registerUser = async (formData) => {
         try {
             const response = await api.post('register/', formData);
             if (response.status === 201) {
                 const data = response.data;
+                
+                // 1. Zapisujemy tokeny
                 setAuthTokens(data);
+                
+                // 2. Dekodujemy token (Tutaj musi być username, jeśli poprawiłaś backend!)
                 const decoded = jwtDecode(data.access);
                 setUser(decoded);
+                
                 localStorage.setItem('authTokens', JSON.stringify(data));
                 
-                if (data.role === 'owner') navigate('/setup-school');
-                else navigate('/');
+                // 3. Używamy danych z DEKODOWANEGO tokena do nawigacji
+                if (decoded.role === 'owner') {
+                    navigate('/setup-school');
+                } else {
+                    navigate('/');
+                }
                 
                 return { success: true };
             }
@@ -57,8 +66,12 @@ export const AuthProvider = ({ children }) => {
                 setUser(decoded); 
                 localStorage.setItem('authTokens', JSON.stringify(data));
 
-                if (decoded.role === 'owner' && !decoded.has_school) navigate('/setup-school');
-                else navigate('/');
+                // Sprawdzamy has_school też z tokena (musi być w MyTokenObtainPairSerializer)
+                if (decoded.role === 'owner' && !decoded.has_school) {
+                    navigate('/setup-school');
+                } else {
+                    navigate('/');
+                }
                 
                 return { success: true };
             }

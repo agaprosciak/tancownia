@@ -6,7 +6,7 @@ import Register from './pages/Register';
 import Login from './pages/Login';
 import SetupSchoolInfo from './pages/SetupSchoolInfo';
 import Home from './pages/Home'; 
-import Profile from './pages/Profile'; 
+import ManageSchool from './components/ManageSchool'; 
 
 function App() {
     const { user, message, setMessage } = useContext(AuthContext); // Wyciągamy message
@@ -28,14 +28,7 @@ function App() {
                 <Route path="/signup-dancer" element={<Register role="user" />} />
                 <Route path="/signup-school" element={<Register role="owner" />} />
 
-                <Route 
-                    path="/profile" 
-                    element={
-                        user?.role === 'owner' && !user?.has_school 
-                        ? <Navigate to="/setup-school" /> 
-                        : <Profile />
-                    } 
-                />
+                <Route path="/profile" element={<ManageSchool />} />
 
                 <Route path="/setup-school" element={<SetupSchoolInfo />} />
                 <Route path="/setup-rooms" element={<div>Tu będzie formularz dodawania sal - KROK 2</div>} />

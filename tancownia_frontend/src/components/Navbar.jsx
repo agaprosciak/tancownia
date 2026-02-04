@@ -13,10 +13,8 @@ const Navbar = () => {
     const isOwner = user?.role === 'owner';
     const manageLabel = isOwner ? "Zarządzaj szkołą" : "Zarządzaj profilem";
     
-    // Jeśli owner nie ma szkoły -> setup. W każdym innym przypadku -> profile.
-    const destinationPath = (isOwner && user?.has_school === false) 
-        ? "/setup-school" 
-        : "/profile";
+
+    const destinationPath = "/profile";
 
     return (
         <nav style={styles.nav}>

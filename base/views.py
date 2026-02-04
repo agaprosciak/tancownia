@@ -5,9 +5,10 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
+from rest_framework.decorators import action
 
 # UZUPEŁNIONE IMPORTY MODELI
-from .models import School, DanceClass, Style, Instructor, Review, User
+from .models import School, DanceClass, Style, Instructor, Review, User, SchoolImage
 
 # UZUPEŁNIONE IMPORTY SERIALIZERÓW
 from .serializers import (
@@ -56,6 +57,28 @@ class SchoolViewSet(viewsets.ModelViewSet):
     filterset_class = SchoolFilter
     search_fields = ['name', 'description', 'classes__subtitle']
 
+    def perform_create(self, serializer):
+        # 1. Zapisujemy podstawowe dane szkoły (w tym logo)
+        school = serializer.save(user=self.request.user)
+
+        # 2. Wyciągamy listę plików z galerii (uploaded_images z React)
+        images = self.request.FILES.getlist('uploaded_images')
+        
+        # 3. Tworzymy rekordy w modelu SchoolImage dla każdego zdjęcia
+        for image in images:
+            SchoolImage.objects.create(school=school, image=image)
+
+    @action(detail=False, methods=['get'])
+    def my_school(self, request):
+        try:
+            # Próba pobrania szkoły przypisanej do zalogowanego usera
+            school = request.user.school 
+            serializer = self.get_serializer(school)
+            return Response(serializer.data)
+        except:
+            # Brak szkoły = sygnał 404 dla Frontendu
+            return Response({"detail": "No school found."}, status=404)
+
 class DanceClassViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
     queryset = DanceClass.objects.all().order_by('starts_at')
@@ -91,30 +114,35 @@ class ReviewViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Tylko tancerze mogą wystawiać opinie!")
         serializer.save(user=self.request.user)
 
-# Widok rejestracji (pod makiety SignUp_dancer i SignUp_school)
+# Widok rejestracji
 class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
     serializer_class = RegisterSerializer
     queryset = User.objects.all()
 
     def create(self, request, *args, **kwargs):
-        # 1. Wywołujemy standardowe tworzenie usera przez serializer
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        # 2. Generujemy tokeny ręcznie dla nowo stworzonego usera
+        # 1. Generujemy token
         refresh = RefreshToken.for_user(user)
         
-        # 3. Przygotowujemy paczkę danych dla Reacta
-        # To są te same dane, których Twój AuthContext szuka przy logowaniu
+        # 2. !!! KLUCZOWY FIX !!! 
+        # Musimy ręcznie dodać dane do ACCESS TOKENA, 
+        # bo RefreshToken.for_user nie używa Twojego MyTokenObtainPairSerializer
+        refresh['username'] = user.username
+        refresh['role'] = user.role
+        refresh['has_school'] = False # Nowy owner nie ma szkoły
+
+        # 3. Przygotowujemy odpowiedź
         return Response({
-            "user": serializer.data, # dane usera (id, email itp.)
+            "user": serializer.data,
             "access": str(refresh.access_token),
             "refresh": str(refresh),
             "username": user.username,
             "role": user.role,
-            "has_school": False # Nowy owner na starcie nigdy nie ma szkoły
+            "has_school": False
         }, status=status.HTTP_201_CREATED)
 
 class MyTokenObtainPairView(TokenObtainPairView):
