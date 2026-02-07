@@ -1,3 +1,4 @@
+from django.forms import ValidationError
 from rest_framework import serializers
 from .models import User, Style, School, SchoolImage, PriceList, Review, Instructor, DanceFloor, DanceClass
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -58,6 +59,7 @@ class SchoolImageSerializer(serializers.ModelSerializer):
         fields = ['id', 'image', 'created_at']
 
 class PriceListSerializer(serializers.ModelSerializer):
+    school = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
         model = PriceList
         fields = '__all__'
@@ -67,30 +69,99 @@ class DanceFloorSerializer(serializers.ModelSerializer):
         model = DanceFloor
         fields = '__all__'
 
+class SimpleSchoolSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = School
+        fields = ['id', 'name']
+
+from rest_framework import serializers
+from .models import Instructor, School, Style
+
+# 1. Mały serializer - tylko ID (do linku) i NAZWA (do wyświetlenia)
+class SimpleSchoolSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = School
+        fields = ['id', 'name'] # Bez miasta, tak jak chciałaś
+
 class InstructorSerializer(serializers.ModelSerializer):
     styles = StyleSerializer(many=True, read_only=True)
+    
+    # 2. Nadpisujemy schools, żeby zwracało listę obiektów, a nie same ID
+    # Dzięki temu frontend dostanie: [{"id": 1, "name": "Szkoła A"}, ...]
+    # I będzie mógł zrobić: navigate(`/school/${school.id}`)
+    schools = SimpleSchoolSerializer(many=True, read_only=True)
+
     class Meta:
         model = Instructor
         fields = '__all__'
+        read_only_fields = ['schools', 'created_by']
 
 class DanceClassSerializer(serializers.ModelSerializer):
-    # Wyświetlamy nazwy zamiast ID dla czytelności we frontendzie
-    style_name = serializers.ReadOnlyField(source='style.style_name')
-    floor_name = serializers.ReadOnlyField(source='floor.name')
-    
+    # JSONField pozwala przyjąć ID (int) lub nową nazwę (str)
+    style = serializers.JSONField() 
+    school = serializers.PrimaryKeyRelatedField(read_only=True)
+
     class Meta:
         model = DanceClass
         fields = '__all__'
 
     def validate(self, data):
-        """
-        Serializery domyślnie nie odpalają metody clean() modelu.
-        Musimy ją wywołać ręcznie, aby Twoja logika kolizji sal działała!
-        """
-        instance = DanceClass(**data)
-        instance.clean()
+        # Pobieramy szkołę z kontekstu (widoku)
+        request = self.context.get('request')
+        user_school = request.user.school
+        style_data = data.get('style')
+        
+        # Tworzymy atrapę stylu tylko do walidacji clean()
+        if isinstance(style_data, int):
+            style_obj = Style.objects.filter(id=style_data).first()
+        else:
+            style_obj = Style(style_name=str(style_data).capitalize())
+
+        # Przygotowujemy dane do clean()
+        temp_data = {**data}
+        temp_data['style'] = style_obj
+        temp_data['school'] = user_school
+        
+        # Many-to-Many (instruktorzy) wywalamy z atrapy, bo clean() ich nie potrzebuje
+        temp_data.pop('instructors', None) 
+        
+        instance = DanceClass(**temp_data)
+        try:
+            instance.clean() # Walidacja kolizji sal i godzin
+        except ValidationError as e:
+            raise serializers.ValidationError(e.message_dict)
+            
         return data
 
+    def create(self, validated_data):
+        style_data = validated_data.pop('style')
+        instructors_data = validated_data.pop('instructors', []) 
+
+        # Logika: znajdź istniejący styl lub stwórz nowy
+        if isinstance(style_data, int):
+            style_obj = Style.objects.get(id=style_data)
+        else:
+            style_name = str(style_data).strip().capitalize()
+            style_obj, created = Style.objects.get_or_create(style_name=style_name)
+
+        # 1. Tworzymy zajęcia
+        dance_class = DanceClass.objects.create(style=style_obj, **validated_data)
+        
+        # 2. Dodajemy instruktorów przez .set() (wymóg Many-to-Many)
+        if instructors_data:
+            dance_class.instructors.set(instructors_data)
+            
+        return dance_class
+
+    def to_representation(self, instance):
+        """
+        FIX: To rozwiązuje błąd 'Style is not JSON serializable'.
+        Zamieniamy obiekt Style na jego ID przed wysłaniem odpowiedzi do Reacta.
+        """
+        ret = super().to_representation(instance)
+        ret['style'] = instance.style.id if instance.style else None
+        return ret
+    
 class SchoolSerializer(serializers.ModelSerializer):
     images = SchoolImageSerializer(many=True, read_only=True)
     floors = DanceFloorSerializer(many=True, read_only=True)

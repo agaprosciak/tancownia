@@ -6,7 +6,13 @@ import Register from './pages/Register';
 import Login from './pages/Login';
 import SetupSchoolInfo from './pages/SetupSchoolInfo';
 import Home from './pages/Home'; 
-import ManageSchool from './components/ManageSchool'; 
+import ManageSchool from './components/ManageSchool';
+import SetupRooms from './pages/SetupRooms';
+import SetupPriceList from './pages/SetupPriceList';
+import SetupClasses from './pages/SetupClasses';
+import EditInstructors from './pages/EditInstructors';
+import EditNews from './pages/EditNews';
+import Instructor from './pages/Instructor';
 
 function App() {
     const { user, message, setMessage } = useContext(AuthContext); // Wyciągamy message
@@ -30,11 +36,17 @@ function App() {
 
                 <Route path="/profile" element={<ManageSchool />} />
 
-                <Route path="/setup-school" element={<SetupSchoolInfo />} />
-                <Route path="/setup-rooms" element={<div>Tu będzie formularz dodawania sal - KROK 2</div>} />
+                <Route path="/setup-info" element={<SetupSchoolInfo />} />
+                <Route path="/setup-rooms" element={<SetupRooms />} />
+                <Route path="/setup-price" element={<SetupPriceList />} />
+                <Route path="/setup-classes" element={<SetupClasses />} />
 
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
+
+                <Route path="/instructors" element={<EditInstructors />} />
+                <Route path="/news" element={<EditNews />} />
+                <Route path="/instructor/:id" element={<Instructor />} />
             </Routes>
         </>
     );

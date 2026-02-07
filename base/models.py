@@ -4,8 +4,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 import datetime
-from django.db.models import Q 
-
+from django.db.models import F
 
 from base.utils.image_upload import (
     school_logo_path,
@@ -296,68 +295,65 @@ class DanceClass(models.Model):
         super().save(*args, **kwargs)
 
     def clean(self):
-        super().clean()
-        
-        # Ustalmy faktyczną datę końca do walidacji (bo w formularzu może być pusta, wtedy bierzemy start)
+        # ====================================================
+        # 1. WALIDACJA TECHNICZNA (DATY I GODZINY)
+        # ====================================================
         effective_end_date = self.last_class_date if self.last_class_date else self.first_class_date
-
-        # 1. Walidacja Daty (Koniec nie może być w przeszłości względem startu)
+        
         if effective_end_date < self.first_class_date:
-             raise ValidationError({'last_class_date': "Data zakończenia nie może być wcześniejsza niż data startu."})
+             raise ValidationError({'last_class_date': "Data końca wcześniejsza niż startu."})
 
-        # 2. Walidacja Godzin
-        # Sprawdzamy "Start < Koniec" TYLKO, jeśli to ten sam dzień.
+        # Dla jednodniowych sprawdzamy logikę godzin (koniec > start)
         if effective_end_date == self.first_class_date:
             if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
-                raise ValidationError({'ends_at': "Godzina zakończenia musi być późniejsza niż startu (dla wydarzeń w tym samym dniu)."})
-            
+                raise ValidationError({'ends_at': "Godzina końca musi być późniejsza niż startu."})
+
         # ====================================================
-        # 3. WALIDACJA KOLIZJI (Sprawdzamy czy sala jest wolna)
+        # 2. LOGIKA KOLIZJI
         # ====================================================
         
-        if self.floor and self.starts_at and self.ends_at and self.first_class_date:
-            # Pobieramy inne zajęcia w tej sali
-            conflicting = DanceClass.objects.filter(school=self.school, floor=self.floor)
+        # --- NAJWAŻNIEJSZE: OLEWAMY KOLIZJE JEŚLI BRAK SALI ---
+        # Jeśli floor to None, kończymy sprawdzanie tutaj.
+        # Dzięki temu możesz mieć 100 zajęć o 18:00 w opcji "Bez sali".
+        if self.floor is None:
+            return
+
+        # Jeśli to event wielodniowy (wyjazd/obóz), też pomijamy sprawdzanie kolizji
+        is_multi_day = effective_end_date > self.first_class_date
+        if not self.periodic and is_multi_day:
+            return
+
+        # Sprawdzamy kolizje tylko jeśli mamy godziny
+        if self.starts_at and self.ends_at:
             
-            # Jeśli edytujemy istniejące zajęcia, wykluczamy "samego siebie" z porównania
+            # Pobieramy wszystko z tej samej szkoły i TEJ SAMEJ SALI
+            # (Tutaj self.floor na pewno nie jest None, bo przeszliśmy ifa wyżej)
+            qs = DanceClass.objects.filter(school=self.school, floor=self.floor)
+
+            # Wykluczamy same siebie (przy edycji), żeby nie kolidować ze sobą
             if self.pk:
-                conflicting = conflicting.exclude(pk=self.pk)
+                qs = qs.exclude(pk=self.pk)
 
-            # Tworzymy pełne znaczniki czasu (datetime) dla precyzji tego konkretnego rekordu
-            my_start_dt = datetime.datetime.combine(self.first_class_date, self.starts_at)
-            my_end_dt = datetime.datetime.combine(effective_end_date, self.ends_at)
+            conflicts = []
 
-            collision_found = None
+            # SCENARIUSZ A: ZAJĘCIA CYKLICZNE (Stały grafik)
+            if self.periodic:
+                # Sprawdzamy kolizję tylko z innymi cyklicznymi w ten sam dzień tygodnia
+                conflicts = qs.filter(periodic=True, day_of_week=self.day_of_week)
 
-            for event in conflicting:
-                # Ustalamy daty dla sprawdzanego eventu z bazy
-                event_end_date = event.last_class_date if event.last_class_date else event.first_class_date
-                
-                # --- LOGIKA KOLIZJI ---
-                
-                # PRZYPADEK A: Oba są wydarzeniami jednorazowymi/wielodniowymi (periodic=False)
-                # Np. Warsztat vs Warsztat -> Sprawdzamy czy zakresy dat i godzin na siebie nachodzą
-                if not self.periodic and not event.periodic:
-                    event_start_dt = datetime.datetime.combine(event.first_class_date, event.starts_at)
-                    event_end_dt = datetime.datetime.combine(event_end_date, event.ends_at)
+            # SCENARIUSZ B: WARSZTAT JEDNODNIOWY
+            else:
+                # Sprawdzamy kolizję z innymi warsztatami w tę samą datę
+                # (Zakładamy, że warsztaty "nadpisują" grafik regularny, więc nie sprawdzamy periodic=True)
+                conflicts = qs.filter(periodic=False, first_class_date=self.first_class_date)
+
+            # --- FAKTYCZNE SPRAWDZENIE ZAKRESÓW GODZIN ---
+            for c in conflicts:
+                # Logika: (Start A < Koniec B) AND (Koniec A > Start B)
+                if self.starts_at < c.ends_at and self.ends_at > c.starts_at:
+                    formatted_start = c.starts_at.strftime('%H:%M')
+                    formatted_end = c.ends_at.strftime('%H:%M')
                     
-                    # Matematyka: (Start A < Koniec B) ORAZ (Koniec A > Start B)
-                    if my_start_dt < event_end_dt and my_end_dt > event_start_dt:
-                        collision_found = event
-                        break
-
-                # PRZYPADEK B: Kolizja z zajęciami cyklicznymi (periodic=True)
-                # Sprawdzamy czy Dzień Tygodnia i Godziny się pokrywają.
-                elif self.periodic or event.periodic:
-                    # Sprawdzamy czy dni tygodnia są te same
-                    if self.day_of_week == event.day_of_week:
-                         if self.starts_at < event.ends_at and self.ends_at > event.starts_at:
-                             collision_found = event
-                             break
-
-            if collision_found:
-                raise ValidationError({
-                    'starts_at': (
-                        f"Kolizja! W sali '{self.floor.name}' odbywa się wtedy: {collision_found.style}."
-                    )
-                })
+                    raise ValidationError({
+                        'starts_at': f"KOLIZJA! W sali '{self.floor.name}' są już zajęcia: {c.style} ({formatted_start}-{formatted_end})"
+                    })

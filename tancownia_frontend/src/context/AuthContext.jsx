@@ -26,28 +26,31 @@ export const AuthProvider = ({ children }) => {
     const [message, setMessage] = useState(null); 
     const navigate = useNavigate();
 
-   const registerUser = async (formData) => {
+    // Sprawdzamy komunikaty po przeładowaniu strony (F5)
+    useEffect(() => {
+        const flashMessage = localStorage.getItem('authMessage');
+        if (flashMessage) {
+            setMessage(flashMessage);
+            localStorage.removeItem('authMessage'); 
+            setTimeout(() => setMessage(null), 3000);
+        }
+    }, []);
+
+    const registerUser = async (formData) => {
         try {
             const response = await api.post('register/', formData);
             if (response.status === 201) {
                 const data = response.data;
-                
-                // 1. Zapisujemy tokeny
                 setAuthTokens(data);
-                
-                // 2. Dekodujemy token (Tutaj musi być username, jeśli poprawiłaś backend!)
                 const decoded = jwtDecode(data.access);
                 setUser(decoded);
-                
                 localStorage.setItem('authTokens', JSON.stringify(data));
                 
-                // 3. Używamy danych z DEKODOWANEGO tokena do nawigacji
                 if (decoded.role === 'owner') {
-                    navigate('/setup-school');
+                    navigate('/setup-info');
                 } else {
                     navigate('/');
                 }
-                
                 return { success: true };
             }
         } catch (error) {
@@ -65,31 +68,24 @@ export const AuthProvider = ({ children }) => {
                 setAuthTokens(data);
                 setUser(decoded); 
                 localStorage.setItem('authTokens', JSON.stringify(data));
-
-                // Sprawdzamy has_school też z tokena (musi być w MyTokenObtainPairSerializer)
-                if (decoded.role === 'owner' && !decoded.has_school) {
-                    navigate('/setup-school');
-                } else {
-                    navigate('/');
-                }
-                
-                return { success: true };
+                return { ...decoded, success: true }; 
             }
         } catch (error) {
             return { error: true, errors: error.response?.data };
         }
     };
 
+
     const logoutUser = () => {
         setAuthTokens(null);
         setUser(null);
         localStorage.removeItem('authTokens');
         
-        // NOWE: Ustawienie komunikatu
-        setMessage("Wylogowano pomyślnie!"); 
-        setTimeout(() => setMessage(null), 3000); // Znika po 3 sek.
+        // 1. Zapisujemy komunikat
+        localStorage.setItem('authMessage', "Wylogowano pomyślnie!"); 
         
-        navigate('/');
+        // 2. ROBIMY TWARDE PRZEŁADOWANIE NA STRONĘ GŁÓWNĄ
+        window.location.href = '/';
     };
 
     const contextData = { 

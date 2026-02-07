@@ -1,36 +1,59 @@
-import { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
 
 const SetupSchoolInfo = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const logoInputRef = useRef(null);
     const fileInputRef = useRef(null);
 
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [isUpdating, setIsUpdating] = useState(false);
+
+    // Sprawdzamy czy weszliśmy z profilu
+    const isEditMode = location.state?.fromProfile;
+
     const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        phone: '', 
-        street: '',
-        build_no: '',
-        postal_code: '',
-        city: '',
-        website: '',
-        instagram: '',
-        facebook: '',
-        description: '',
-        rules: '',
-        default_registration_info_link: '',
-        county: '',   
-        state: '',    
-        latitude: '',
-        longitude: ''
+        name: '', email: '', phone: '', street: '', build_no: '', postal_code: '',
+        city: '', website: '', instagram: '', facebook: '', description: '',
+        rules: '', default_registration_info_link: '', county: '', state: '',
+        latitude: '', longitude: ''
     });
 
     const [logo, setLogo] = useState(null);
     const [logoPreview, setLogoPreview] = useState(null);
     const [gallery, setGallery] = useState([]); 
+    const [deletedImages, setDeletedImages] = useState([]); 
+
+    useEffect(() => {
+        api.get('schools/my_school/')
+            .then(res => {
+                if (res.data) {
+                    setIsUpdating(true);
+                    
+                    const fields = {};
+                    Object.keys(formData).forEach(key => {
+                        fields[key] = res.data[key] || '';
+                    });
+                    setFormData(fields);
+                    
+                    if (res.data.logo) setLogoPreview(res.data.logo);
+                    
+                    if (res.data.images) {
+                        const existingImages = res.data.images.map(img => ({
+                            id: img.id,
+                            preview: img.image,
+                            isExisting: true 
+                        }));
+                        setGallery(existingImages);
+                    }
+                }
+            })
+            .catch(() => console.log("Brak szkoły, tworzymy nową."))
+            .finally(() => setLoading(false));
+    }, []);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -54,13 +77,18 @@ const SetupSchoolInfo = () => {
         }
         const newImages = files.map(file => ({
             file,
-            preview: URL.createObjectURL(file)
+            preview: URL.createObjectURL(file),
+            isExisting: false 
         }));
         setGallery([...gallery, ...newImages]);
         if (fileInputRef.current) fileInputRef.current.value = ""; 
     };
 
     const removeImage = (index) => {
+        const imageToRemove = gallery[index];
+        if (imageToRemove.isExisting) {
+            setDeletedImages([...deletedImages, imageToRemove.id]);
+        }
         setGallery(gallery.filter((_, i) => i !== index));
     };
 
@@ -68,7 +96,6 @@ const SetupSchoolInfo = () => {
         e.preventDefault();
         setError('');
 
-        // --- 1. WALIDACJA SOCIAL MEDIA (http + domena) ---
         if (formData.instagram && (!formData.instagram.toLowerCase().includes('instagram.com') || !formData.instagram.toLowerCase().includes('http'))) {
             setError("Link do Instagrama musi być pełnym adresem (zawierać http oraz instagram.com)");
             return;
@@ -77,41 +104,33 @@ const SetupSchoolInfo = () => {
             setError("Link do Facebooka musi być pełnym adresem (zawierać http oraz facebook.com)");
             return;
         }
-
-        // --- 2. WALIDACJA TELEFONU ---
         const phoneRegex = /^[0-9\s+]*$/;
         if (formData.phone && !phoneRegex.test(formData.phone)) {
             setError("Numer telefonu może zawierać tylko cyfry, spacje i znak +");
             return;
         }
         
-        // --- 3. GEOKODOWANIE W TLE ---
-        let geoData = { lat: '', lon: '', state: '', county: '' };
+        let geoData = { lat: formData.latitude, lon: formData.longitude, state: formData.state, county: formData.county };
         const { street, build_no, city, postal_code } = formData;
-        const query = `${street} ${build_no}, ${postal_code} ${city}, Poland`;
-        
+        const cleanBuildNo = build_no.split('/')[0].trim();
+        const query = `${street} ${cleanBuildNo}, ${postal_code} ${city}, Poland`;
         try {
             const geoResponse = await fetch(
                 `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=1`,
                 { headers: { 'User-Agent': 'Tancownia-App-v1' } }
             );
             const geoResult = await geoResponse.json();
-            
-            if (!geoResult || geoResult.length === 0) {
-                setError(`Nie znaleźliśmy adresu: ${street} ${build_no}. Sprawdź dane adresowe.`);
-                return; 
+            if (geoResult && geoResult.length > 0) {
+                const res = geoResult[0];
+                geoData = {
+                    lat: parseFloat(res.lat).toFixed(6),
+                    lon: parseFloat(res.lon).toFixed(6),
+                    state: res.address.state || res.address.province || '',
+                    county: res.address.county || res.address.city || ''
+                };
             }
-
-            const res = geoResult[0];
-            geoData = {
-                lat: parseFloat(res.lat).toFixed(6),
-                lon: parseFloat(res.lon).toFixed(6),
-                state: res.address.state || res.address.province || '',
-                county: res.address.county || res.address.city || ''
-            };
         } catch (err) { console.error(err); }
 
-        // --- 4. WYSYŁKA ---
         const data = new FormData();
         Object.keys(formData).forEach(key => data.append(key, formData[key].trim()));
 
@@ -121,28 +140,65 @@ const SetupSchoolInfo = () => {
         data.set('county', geoData.county);
 
         if (logo) data.append('logo', logo);
-        gallery.forEach(img => data.append('uploaded_images', img.file));
+        
+        gallery.forEach(img => {
+            if (!img.isExisting && img.file) {
+                data.append('uploaded_images', img.file);
+            }
+        });
+
+        deletedImages.forEach(id => {
+            data.append('deleted_images', id);
+        });
 
         try {
-            const response = await api.post('schools/', data, {
+            const method = isUpdating ? 'put' : 'post';
+            const url = isUpdating ? 'schools/my_school/' : 'schools/';
+            
+            const response = await api[method](url, data, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-            if (response.status === 201) navigate('/setup-rooms');
+            
+            if (response.status === 201 || response.status === 200) {
+                if (isEditMode) {
+                    navigate('/profile');
+                } else {
+                    navigate('/setup-rooms');
+                }
+            }
         } catch (err) {
             const serverMsg = err.response?.data ? Object.values(err.response.data).flat()[0] : "Błąd serwera.";
             setError(serverMsg);
         }
     };
 
+    if (loading) return <div style={{textAlign: 'center', padding: '50px'}}>Wczytywanie informacji...</div>;
+
     return (
         <div style={styles.container}>
-            <h1 style={styles.mainTitle}>Wypełnij informacje o swojej szkole</h1>
+            {/* --- ZMODYFIKOWANY NAGŁÓWEK --- */}
+            <div style={styles.headerRow}>
+                {isEditMode && (
+                    <span 
+                        className="material-symbols-outlined" 
+                        style={styles.backArrow} 
+                        onClick={() => navigate('/profile')}
+                    >
+                        arrow_back_ios
+                    </span>
+                )}
+                <h1 style={styles.mainTitle}>
+                    {isUpdating ? 'Edytuj informacje o szkole' : 'Wypełnij informacje o swojej szkole'}
+                </h1>
+                {isEditMode && <div style={{width: '24px'}}></div>}
+            </div>
+
             <div style={styles.card}>
                 <form onSubmit={handleSubmit}>
-                    
+                    {/* ... SEKCJE FORMULARZA (BEZ ZMIAN) ... */}
                     <div style={styles.section}>
                         <label style={styles.label}>Nazwa szkoły*</label>
-                        <input style={styles.input} name="name" required onChange={handleChange} />
+                        <input style={styles.input} name="name" value={formData.name} required onChange={handleChange} />
                         
                         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginTop: '15px' }}>
                             <button type="button" onClick={() => logoInputRef.current.click()} style={styles.uniformUploadBtn}>
@@ -158,35 +214,35 @@ const SetupSchoolInfo = () => {
                     </div>
 
                     <div style={styles.row}>
-                        <div style={styles.col}><label style={styles.label}>E-mail*</label><input style={styles.input} name="email" type="email" required onChange={handleChange} /></div>
-                        <div style={styles.col}><label style={styles.label}>Telefon</label><input style={styles.input} name="phone" onChange={handleChange} /></div>
+                        <div style={styles.col}><label style={styles.label}>E-mail*</label><input style={styles.input} name="email" value={formData.email} type="email" required onChange={handleChange} /></div>
+                        <div style={styles.col}><label style={styles.label}>Telefon</label><input style={styles.input} name="phone" value={formData.phone} onChange={handleChange} /></div>
                     </div>
 
                     <div style={styles.row}>
-                        <div style={{flex: 2}}><label style={styles.label}>Ulica*</label><input style={styles.input} name="street" required onChange={handleChange} /></div>
-                        <div style={{flex: 1}}><label style={styles.label}>Nr*</label><input style={styles.input} name="build_no" required onChange={handleChange} /></div>
+                        <div style={{flex: 2}}><label style={styles.label}>Ulica*</label><input style={styles.input} name="street" value={formData.street} required onChange={handleChange} /></div>
+                        <div style={{flex: 1}}><label style={styles.label}>Nr*</label><input style={styles.input} name="build_no" value={formData.build_no} placeholder="np. 12 lub 12/4" required onChange={handleChange} /></div>
                     </div>
                     <div style={styles.row}>
-                        <div style={styles.col}><label style={styles.label}>Kod pocztowy*</label><input style={styles.input} name="postal_code" required onChange={handleChange} /></div>
-                        <div style={styles.col}><label style={styles.label}>Miejscowość*</label><input style={styles.input} name="city" required onChange={handleChange} /></div>
+                        <div style={styles.col}><label style={styles.label}>Kod pocztowy*</label><input style={styles.input} name="postal_code" value={formData.postal_code} required onChange={handleChange} /></div>
+                        <div style={styles.col}><label style={styles.label}>Miejscowość*</label><input style={styles.input} name="city" value={formData.city} required onChange={handleChange} /></div>
                     </div>
 
                     <div style={styles.section}>
                         <label style={styles.label}>Strona internetowa</label>
-                        <input style={styles.input} type="url" name="website" placeholder="Link do strony" onChange={handleChange} />
+                        <input style={styles.input} type="url" name="website" value={formData.website} placeholder="Link do strony" onChange={handleChange} />
                         <div style={styles.row}>
-                            <div style={styles.col}><label style={styles.label}>Instagram</label><input style={styles.input} name="instagram" placeholder="http://instagram.com/twoja_szkola" onChange={handleChange} /></div>
-                            <div style={styles.col}><label style={styles.label}>Facebook</label><input style={styles.input} name="facebook" placeholder="http://facebook.com/twoja_szkola" onChange={handleChange} /></div>
+                            <div style={styles.col}><label style={styles.label}>Instagram</label><input style={styles.input} name="instagram" value={formData.instagram} placeholder="http://instagram.com/twoja_szkola" onChange={handleChange} /></div>
+                            <div style={styles.col}><label style={styles.label}>Facebook</label><input style={styles.input} name="facebook" value={formData.facebook} placeholder="http://facebook.com/twoja_szkola" onChange={handleChange} /></div>
                         </div>
                     </div>
 
                     <div style={styles.section}>
                         <label style={styles.label}>Opis szkoły*</label>
-                        <textarea style={styles.textarea} name="description" required onChange={handleChange} />
+                        <textarea style={styles.textarea} name="description" value={formData.description} required onChange={handleChange} />
                         <label style={styles.label}>Regulamin</label>
-                        <textarea style={styles.textarea} name="rules" onChange={handleChange} placeholder="Link lub tekst" />
+                        <textarea style={styles.textarea} name="rules" value={formData.rules} onChange={handleChange} placeholder="Link lub tekst" />
                         <label style={styles.label}>Zapisy</label>
-                        <textarea style={styles.textarea} name="default_registration_info_link" onChange={handleChange} placeholder="Informacje o zapisach" />
+                        <textarea style={styles.textarea} name="default_registration_info_link" value={formData.default_registration_info_link} onChange={handleChange} placeholder="Informacje o zapisach" />
                     </div>
 
                     <div style={styles.section}>
@@ -212,7 +268,7 @@ const SetupSchoolInfo = () => {
 
                     {error && <div style={styles.errorText}>{error}</div>}
 
-                    <button type="submit" style={styles.button}>Zapisz i przejdź dalej</button>
+                    <button type="submit" style={styles.button}>{isUpdating ? 'Zapisz zmiany' : 'Zapisz i przejdź dalej'}</button>
                 </form>
             </div>
         </div>
@@ -220,9 +276,14 @@ const SetupSchoolInfo = () => {
 };
 
 const styles = {
-    container: { backgroundColor: '#F8F9FF', minHeight: '100vh', padding: '40px 20px' },
-    card: { backgroundColor: 'white', maxWidth: '800px', margin: '0 auto', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' },
-    mainTitle: { textAlign: 'center', fontWeight: '300', marginBottom: '40px', fontSize: '28px' },
+    container: { backgroundColor: '#F8F9FF', minHeight: '100vh', padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
+    
+    // DODANE STYLE NAGŁÓWKA
+    headerRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: '800px', marginBottom: '30px' },
+    backArrow: { fontSize: '24px', cursor: 'pointer', color: '#333', fontWeight: 'bold' },
+    mainTitle: { fontWeight: '300', fontSize: '28px', margin: 0, textAlign: 'center' },
+
+    card: { backgroundColor: 'white', maxWidth: '800px', width: '100%', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' },
     section: { marginBottom: '25px' },
     label: { display: 'block', fontSize: '14px', marginBottom: '8px', color: '#434343', fontWeight: '500' },
     input: { width: '100%', padding: '12px', border: '1px solid #E0E0E0', borderRadius: '6px', marginBottom: '10px' },

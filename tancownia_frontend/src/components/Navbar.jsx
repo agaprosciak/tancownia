@@ -9,12 +9,15 @@ const Navbar = () => {
     const [isRegOpen, setIsRegOpen] = useState(false);
     const [isUserOpen, setIsUserOpen] = useState(false);
 
-    // Dynamiczne dane na podstawie roli z tokena
     const isOwner = user?.role === 'owner';
     const manageLabel = isOwner ? "Zarządzaj szkołą" : "Zarządzaj profilem";
-    
-
     const destinationPath = "/profile";
+
+    // Funkcja wylogowania z przeładowaniem
+    const handleLogout = () => {
+        setIsUserOpen(false); // Zamykamy dropdown
+        logoutUser(); // To teraz zrobi reload i przeniesie do /login
+    };
 
     return (
         <nav style={styles.nav}>
@@ -55,7 +58,8 @@ const Navbar = () => {
                                 <Link to={destinationPath} style={styles.dropItem} onClick={() => setIsUserOpen(false)}>
                                     {manageLabel}
                                 </Link>
-                                <div style={styles.dropItem} onClick={() => { logoutUser(); setIsUserOpen(false); }}>
+                                {/* TU ZMIANA: używamy handleLogout zamiast samego logoutUser */}
+                                <div style={styles.dropItem} onClick={handleLogout}>
                                     Wyloguj się
                                 </div>
                             </div>
@@ -67,7 +71,6 @@ const Navbar = () => {
     );
 };
 
-// ... style zostaw bez zmian (są poprawne) ...
 const styles = {
     nav: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 60px', height: '75px', backgroundColor: 'white', borderBottom: '1px solid #f0f0f0', position: 'relative', zIndex: 1000 },
     logoLink: { display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' },

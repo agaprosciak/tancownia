@@ -1,7 +1,10 @@
 import { useState, useContext } from 'react';
 import AuthContext from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import api from '../api'; // <--- 1. DODANO IMPORT API
 
 const Login = () => {
+    const navigate = useNavigate();
     const { loginUser } = useContext(AuthContext);
     const [formData, setFormData] = useState({ email: '', password: '' });
     const [error, setError] = useState('');
@@ -10,22 +13,45 @@ const Login = () => {
         e.preventDefault();
         setError('');
         
-        // Wywołujemy funkcję logowania z Contextu
         const result = await loginUser(formData.email, formData.password);
         
+        console.log("Wynik logowania:", result);
+
         if (result && result.error) {
-            setError('Błędny e-mail lub hasło. Spróbuj ponownie.');
+            setError('Błędny e-mail lub hasło.');
+        } else {
+            // --- 2. ZMIENIONA LOGIKA PRZEKIEROWANIA ---
+            if (result?.role === 'owner') {
+                try {
+                    // Sprawdzamy czy właściciel ma już szkołę i sale
+                    const res = await api.get('schools/my_school/');
+                    const hasSchool = res.data && res.data.id;
+                    const hasRooms = res.data.floors && res.data.floors.length > 0;
+
+                    if (hasSchool && hasRooms) {
+                        console.log("Owner gotowy - leci na Główną");
+                        navigate('/'); 
+                    } else {
+                        console.log("Owner niegotowy - leci do Profilu dokończyć setup");
+                        navigate('/profile');
+                    }
+                } catch (err) {
+                    // Jak błąd (np. 404 brak szkoły), to do profilu żeby założył
+                    console.log("Błąd sprawdzania szkoły - leci do Profilu");
+                    navigate('/profile');
+                }
+            } else {
+                console.log("Tancerz zalogowany - wysyłam na stronę główną");
+                navigate('/');
+            }
         }
     };
 
     return (
         <div style={styles.container}>
-            {/* Cieńszy nagłówek zgodnie z Twoim życzeniem */}
             <h1 style={styles.title}>Zaloguj się</h1>
-            
             <div style={styles.card}>
                 <form onSubmit={handleSubmit} style={styles.form}>
-                    {/* Cieńsza czcionka labeli (400) */}
                     <label style={styles.label}>E-mail</label>
                     <input 
                         type="email" 
@@ -61,7 +87,7 @@ const styles = {
     title: { 
         fontSize: '32px', 
         marginBottom: '40px', 
-        fontWeight: '300', // Lekka czcionka nagłówka
+        fontWeight: '300',
         color: '#212529'
     },
     card: { 
@@ -75,7 +101,7 @@ const styles = {
     form: { display: 'flex', flexDirection: 'column', textAlign: 'left' },
     label: { 
         fontSize: '14px', 
-        fontWeight: '400', // Cieńsze opisy pól
+        fontWeight: '400',
         marginBottom: '10px', 
         color: '#434343' 
     },
