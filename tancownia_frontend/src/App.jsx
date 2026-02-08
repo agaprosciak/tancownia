@@ -13,6 +13,9 @@ import SetupClasses from './pages/SetupClasses';
 import EditInstructors from './pages/EditInstructors';
 import EditNews from './pages/EditNews';
 import Instructor from './pages/Instructor';
+import School from './pages/School';
+import MyReviews from './pages/MyReviews';
+import SearchResults from './pages/SearchResults';
 
 function App() {
     const { user, message, setMessage } = useContext(AuthContext); // Wyciągamy message
@@ -47,6 +50,10 @@ function App() {
                 <Route path="/instructors" element={<EditInstructors />} />
                 <Route path="/news" element={<EditNews />} />
                 <Route path="/instructor/:id" element={<Instructor />} />
+                <Route path="/school/:id" element={<School />} />
+                <Route path="/my-reviews" element={<MyReviews />} />
+                <Route path="/search" element={<SearchResults />} />
+                
             </Routes>
         </>
     );

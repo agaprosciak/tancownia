@@ -5,7 +5,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 
@@ -169,19 +169,19 @@ class PriceListViewSet(viewsets.ModelViewSet):
         school.benefit_cards_info = cards_data.get('info', '')
         school.save()
 
-        # 2. Cennik - Tutaj mapujemy Twój toggle
+        # 2. Cennik
         school.price_list.all().delete()
         for item in prices_data:
-            # Wyciągamy wartość z toggla (Karnet/Wejście)
-            # Zakładamy, że React przesyła 'pass' lub 'single'
-            e_type = item.get('type')
+            # FIX: Use 'entry_type' instead of 'type'
+            e_type = item.get('entry_type')
             
-            # Jeśli jakimś cudem toggle wysłał pustkę, dajemy 'single' jako bezpiecznik
             if not e_type:
                 e_type = 'single'
 
-            # Logika liczby wejść (dla pojedynczych wejść lub karnetów "unlimited" dajemy NULL)
-            entries = item.get('entries')
+            # FIX: Frontend sends 'entries_per_week', not 'entries'
+            entries = item.get('entries_per_week')
+            
+            # Logic for unlimited/single
             if item.get('unlimited') or e_type == 'single':
                 entries = None
 
@@ -189,14 +189,16 @@ class PriceListViewSet(viewsets.ModelViewSet):
                 school=school,
                 name=item.get('name'),
                 price=item.get('price'),
-                entry_type=e_type, # <--- TU WPADA WARTOŚĆ Z TOGGLA
-                duration_minutes=item.get('duration') or 60,
+                entry_type=e_type, 
+                # FIX: Frontend sends 'duration_minutes', not 'duration'
+                duration_minutes=item.get('duration_minutes') or 60,
                 entries_per_week=entries,
-                description=item.get('details', '')
+                # FIX: Frontend sends 'description', not 'details'
+                description=item.get('description', '')
             )
                 
         return Response({"status": "success"}, status=201)
-
+    
 class DanceClassViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
     queryset = DanceClass.objects.all().order_by('starts_at')
@@ -292,19 +294,19 @@ class InstructorViewSet(viewsets.ModelViewSet):
             instructor.schools.add(self.request.user.school)
 
         
-# Widok recenzji
 class ReviewViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
+    
+    filter_backends = [dj_filters.DjangoFilterBackend] 
+    filterset_fields = ['school'] 
 
     def get_permissions(self):
-        # Czytać opinie może każdy (makieta School), ale dodawać tylko zalogowani
         if self.action == 'create':
             return [IsAuthenticated()]
         return [AllowAny()]
 
     def perform_create(self, serializer):
-        # Blokada dla Ownera - tylko tancerz (role='user') wystawia opinie
         if self.request.user.role != 'user':
             raise PermissionDenied("Tylko tancerze mogą wystawiać opinie!")
         serializer.save(user=self.request.user)
@@ -342,4 +344,51 @@ class RegisterView(generics.CreateAPIView):
 
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def custom_change_username(request):
+    user = request.user
+
+    new_username = request.data.get('new_username')
+    password = request.data.get('current_password')
+
+    if not new_username or not password:
+        return Response({'error': 'Podaj nową nazwę i hasło'}, status=400)
+
+    if not user.check_password(password):
+        return Response({'error': 'Błędne hasło'}, status=400)
+
+    if User.objects.filter(username=new_username).exists():
+        return Response({'error': 'Ta nazwa jest już zajęta'}, status=400)
+
+    try:
+        user.username = new_username
+        user.save()
+        return Response({'success': 'Nazwa zmieniona'})
+    except Exception as e:
+        return Response({'error': 'Wystąpił błąd serwera'}, status=500)
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def custom_change_password(request):
+    user = request.user
+    current_password = request.data.get('current_password')
+    new_password = request.data.get('new_password')
+
+    # 1. Sprawdź czy podano hasła
+    if not current_password or not new_password:
+        return Response({'error': 'Podaj obecne i nowe hasło.'}, status=400)
+
+    # 2. Sprawdź czy obecne hasło jest dobre
+    if not user.check_password(current_password):
+        return Response({'error': 'Obecne hasło jest nieprawidłowe.'}, status=400)
+
+    # 3. Zmień hasło i zapisz
+    try:
+        user.set_password(new_password)
+        user.save()
+        return Response({'success': 'Hasło zostało zmienione.'})
+    except Exception as e:
+        return Response({'error': 'Wystąpił błąd serwera.'}, status=500)
 
