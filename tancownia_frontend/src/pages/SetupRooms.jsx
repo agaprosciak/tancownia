@@ -10,7 +10,6 @@ const SetupRooms = () => {
     const [onlyOneRoom, setOnlyOneRoom] = useState(false);
     const [rooms, setRooms] = useState([{ name: '' }]);
     
-    // Sprawdzamy czy to tryb edycji z profilu
     const isEditMode = location.state?.fromProfile;
 
     useEffect(() => {
@@ -77,7 +76,7 @@ const SetupRooms = () => {
 
     return (
         <div style={styles.container}>
-            {/* --- ZMIANA NAGŁÓWKA --- */}
+            {/* --- NAGŁÓWEK --- */}
             <div style={styles.headerRow}>
                 {isEditMode && (
                     <span 
@@ -145,7 +144,6 @@ const SetupRooms = () => {
 const styles = {
     container: { backgroundColor: '#F8F9FF', minHeight: '100vh', padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
     
-    // NOWE STYLE NAGŁÓWKA
     headerRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: '600px', marginBottom: '30px' },
     backArrow: { fontSize: '24px', cursor: 'pointer', color: '#333', fontWeight: 'bold' },
     mainTitle: { fontWeight: '300', fontSize: '28px', margin: 0, textAlign: 'center' },

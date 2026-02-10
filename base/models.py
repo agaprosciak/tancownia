@@ -13,8 +13,6 @@ from base.utils.image_upload import (
     validate_image,
 )
 
-
-
 class User(AbstractUser):
     ROLE_CHOICES = [
         ('user', 'User'),
@@ -94,7 +92,7 @@ class School(models.Model):
         verbose_name="Akceptujemy PZU Sport"
     )
 
-    # Pole na dodatkowe info (np. "Wymagana kaucja 50 zł", "Dopłata 10 zł")
+    # Pole na dodatkowe informacje (np. "Wymagana kaucja 50 zł", "Dopłata 10 zł")
     benefit_cards_info = models.TextField(
         blank=True, 
         null=True, 
@@ -259,7 +257,6 @@ class DanceClass(models.Model):
         help_text="Zostaw puste, jeśli grupa nie ma górnej granicy (np. dla grupy 16+ lub dorosłych)."
     )
     
-    # === TERMINARZ ===
     # Zawsze uzupełniany w save na podstawie daty startu
     day_of_week = models.CharField(max_length=20, choices=DAYS_OF_WEEK, blank=True)
     
@@ -283,54 +280,46 @@ class DanceClass(models.Model):
         return f"{self.style} ({self.day_of_week} {self.starts_at})"
     
     def save(self, *args, **kwargs):
-        # 1. Automat Dnia Tygodnia (zawsze na podstawie daty startu)
+        # Dzień tygodnia zawsze na podstawie daty startu
         if self.first_class_date:
             days_keys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
             self.day_of_week = days_keys[self.first_class_date.weekday()]
 
-        # 2. Automat Daty Końca (Żeby event jednodniowy miał datę końca = data startu)
+        # Automatycznie ustawiana daty końca (Żeby event jednodniowy miał datę końca = data startu)
         if not self.last_class_date:
             self.last_class_date = self.first_class_date
 
         super().save(*args, **kwargs)
 
     def clean(self):
-        # ====================================================
-        # 1. WALIDACJA TECHNICZNA (DATY I GODZINY)
-        # ====================================================
+        # Walidacja daty i godziny
+
         effective_end_date = self.last_class_date if self.last_class_date else self.first_class_date
         
         if effective_end_date < self.first_class_date:
              raise ValidationError({'last_class_date': "Data końca wcześniejsza niż startu."})
 
-        # Dla jednodniowych sprawdzamy logikę godzin (koniec > start)
+        # Dla jednodniowych wydarzeń sprawdzamy logikę godzin (koniec > start)
         if effective_end_date == self.first_class_date:
             if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
                 raise ValidationError({'ends_at': "Godzina końca musi być późniejsza niż startu."})
 
-        # ====================================================
-        # 2. LOGIKA KOLIZJI
-        # ====================================================
-        
-        # --- NAJWAŻNIEJSZE: OLEWAMY KOLIZJE JEŚLI BRAK SALI ---
-        # Jeśli floor to None, kończymy sprawdzanie tutaj.
-        # Dzięki temu możesz mieć 100 zajęć o 18:00 w opcji "Bez sali".
+        # Logika kolizji zajęć w salach
         if self.floor is None:
             return
 
-        # Jeśli to event wielodniowy (wyjazd/obóz), też pomijamy sprawdzanie kolizji
+        # Jeśli to wydarzenie wielodniowe, też pomijamy sprawdzanie kolizji
         is_multi_day = effective_end_date > self.first_class_date
         if not self.periodic and is_multi_day:
             return
 
-        # Sprawdzamy kolizje tylko jeśli mamy godziny
+        # Sprawdzamy kolizje tylko jeśli istnieją godziny startu i końca
         if self.starts_at and self.ends_at:
             
-            # Pobieramy wszystko z tej samej szkoły i TEJ SAMEJ SALI
-            # (Tutaj self.floor na pewno nie jest None, bo przeszliśmy ifa wyżej)
+            # Pobieramy wszystko z tej samej szkoły i tej samej sali
             qs = DanceClass.objects.filter(school=self.school, floor=self.floor)
 
-            # Wykluczamy same siebie (przy edycji), żeby nie kolidować ze sobą
+            # Wykluczamy aktualnie edytowane zajęcia, żeby nie kolidować ze sobą
             if self.pk:
                 qs = qs.exclude(pk=self.pk)
 
@@ -344,10 +333,9 @@ class DanceClass(models.Model):
             # SCENARIUSZ B: WARSZTAT JEDNODNIOWY
             else:
                 # Sprawdzamy kolizję z innymi warsztatami w tę samą datę
-                # (Zakładamy, że warsztaty "nadpisują" grafik regularny, więc nie sprawdzamy periodic=True)
                 conflicts = qs.filter(periodic=False, first_class_date=self.first_class_date)
 
-            # --- FAKTYCZNE SPRAWDZENIE ZAKRESÓW GODZIN ---
+            # Sprawdzanie zakresów godzin
             for c in conflicts:
                 # Logika: (Start A < Koniec B) AND (Koniec A > Start B)
                 if self.starts_at < c.ends_at and self.ends_at > c.starts_at:

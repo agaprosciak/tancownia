@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import api from '../api'; // Importujemy naszą instancję Axiosa
+import api from '../api';
 
 const SchoolList = () => {
     const [schools, setSchools] = useState([]);

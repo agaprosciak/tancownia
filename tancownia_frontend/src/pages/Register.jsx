@@ -1,5 +1,5 @@
 import { useState, useContext } from 'react';
-import { Link } from 'react-router-dom'; // <--- DODANY IMPORT
+import { Link } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 
 const Register = ({ role }) => {
@@ -73,7 +73,6 @@ const Register = ({ role }) => {
                     />
                     {fieldErrors.confirmPassword && <span style={styles.errorText}>{fieldErrors.confirmPassword}</span>}
 
-                    {/* --- ZGODY PRAWNE --- */}
                     <div style={styles.legalText}>
                         Rejestrując się, akceptujesz <Link to="/terms" style={styles.link}>Regulamin</Link> i <Link to="/privacy" style={styles.link}>Politykę Prywatności</Link>.
                     </div>
@@ -95,7 +94,6 @@ const styles = {
     inputError: { padding: '12px', border: '1px solid #ff4d4f', borderRadius: '6px', marginBottom: '5px', fontSize: '15px' },
     errorText: { color: '#ff4d4f', fontSize: '12px', marginBottom: '12px', fontWeight: '500' },
     
-    // NOWE STYLE DLA ZGÓD
     legalText: { fontSize: '12px', color: '#777', marginTop: '5px', marginBottom: '15px', lineHeight: '1.5' },
     link: { color: '#7A33E3', textDecoration: 'underline', cursor: 'pointer' },
 

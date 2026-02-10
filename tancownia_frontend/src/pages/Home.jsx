@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
-// --- HELPER DEBOUNCE ---
+
 const debounce = (func, delay) => {
     let timer;
     return function (...args) {
@@ -15,7 +15,7 @@ const debounce = (func, delay) => {
     };
 };
 
-// --- HELPER: NORMALIZACJA TEKSTU ---
+
 const normalizeRegion = (text) => {
     if (!text) return '';
     return text.toLowerCase()
@@ -26,7 +26,7 @@ const normalizeRegion = (text) => {
         .trim();
 };
 
-// --- HELPER: POBIERANIE DANYCH MIASTA (Do Entera) ---
+
 const getCityData = async (query) => {
     if (!query || query.length < 2) return [];
     try {
@@ -45,7 +45,7 @@ const getCityData = async (query) => {
     }
 };
 
-// --- HELPER: OBLICZANIE ODLEGŁOŚCI ---
+// OBLICZANIE ODLEGŁOŚCI
 const deg2rad = (deg) => deg * (Math.PI / 180);
 
 const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
@@ -64,7 +64,6 @@ const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
 const Home = () => {
     const navigate = useNavigate();
     
-    // --- DANE ---
     const [schools, setSchools] = useState([]);
     const [instructors, setInstructors] = useState([]);
     const [allStyles, setAllStyles] = useState([]);
@@ -72,28 +71,23 @@ const Home = () => {
 
     const [currentSlide, setCurrentSlide] = useState(0);
 
-    // --- HERO SEARCH ---
     const [heroCityInput, setHeroCityInput] = useState('Cała Polska');
     const [heroCitySuggestions, setHeroCitySuggestions] = useState([]);
     const [showHeroCityDropdown, setShowHeroCityDropdown] = useState(false);
     const [heroSelectedLocation, setHeroSelectedLocation] = useState(null);
     
-    // --- CHECKBOX ---
     const [isExtendedRadius, setIsExtendedRadius] = useState(false);
 
-    // --- CONTENT FILTER ---
     const [contentCityInput, setContentCityInput] = useState('Cała Polska');
     const [confirmedContentCity, setConfirmedContentCity] = useState('Cała Polska');
     const [selectedContentLocation, setSelectedContentLocation] = useState(null); 
     const [contentCitySuggestions, setContentCitySuggestions] = useState([]);
     const [showContentCityDropdown, setShowContentCityDropdown] = useState(false);
 
-    // --- MAIN SEARCH ---
     const [searchQuery, setSearchQuery] = useState('');
     const [searchSuggestions, setSearchSuggestions] = useState({ schools: [], instructors: [], styles: [] });
     const [showSearchDropdown, setShowSearchDropdown] = useState(false);
 
-    // --- WYNIKI ---
     const [topStyles, setTopStyles] = useState([]);
     const [filteredSchools, setFilteredSchools] = useState([]);
 
@@ -101,7 +95,6 @@ const Home = () => {
     const heroCityWrapperRef = useRef(null);
     const contentCityWrapperRef = useRef(null);
 
-    // 1. POBIERANIE DANYCH
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -130,7 +123,7 @@ const Home = () => {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // 2. LOGIKA FILTROWANIA
+    // LOGIKA FILTROWANIA
     useEffect(() => {
         if (loading || !schools.length) return;
 
@@ -188,7 +181,7 @@ const Home = () => {
     }, [selectedContentLocation, confirmedContentCity, schools, loading, isExtendedRadius]);
 
 
-    // 3. OBLICZANIE TOP STYLÓW
+    //OBLICZANIE TOP STYLÓW
     useEffect(() => {
         const styleCounts = {};
         filteredSchools.forEach(school => {
@@ -209,7 +202,6 @@ const Home = () => {
     }, [filteredSchools]);
 
 
-    // --- NOMINATIM (Z DEDUPLIKACJĄ) ---
     const fetchCities = async (query, target) => {
         if (!query || query.length < 2) return;
         
@@ -272,7 +264,6 @@ const Home = () => {
 
     const debouncedCitySearch = useRef(debounce(fetchCities, 500)).current;
 
-    // --- HANDLERY ---
     const handleHeroCityInput = (e) => {
         setHeroCityInput(e.target.value);
         debouncedCitySearch(e.target.value, 'hero');
@@ -306,11 +297,11 @@ const Home = () => {
         setShowContentCityDropdown(false);
     };
 
-    // --- NAWIGACJA DO WYNIKÓW ---
+    // NAWIGACJA DO WYNIKÓW
     const goToSearch = (query, locationObj, cityString) => {
         let url = `/search?q=${encodeURIComponent(query)}&city=${encodeURIComponent(cityString)}`;
         
-        // Dodajemy parametry geo TYLKO jeśli mamy obiekt locationObj i nie jest to Cała Polska
+        // Dodawane parametry geo TYLKO jeśli mamy obiekt locationObj i nie jest to Cała Polska
         if (locationObj && cityString !== 'Cała Polska') {
             url += `&lat=${locationObj.lat}&lon=${locationObj.lon}`;
             if (locationObj.boundingbox) {
@@ -340,7 +331,7 @@ const Home = () => {
         setShowSearchDropdown(true);
     };
 
-    // --- KLIKNIĘCIE W WYNIK Z LISTY ---
+    //KLIKNIĘCIE NA WYNIK Z LISTY
     const handleResultClick = (type, item) => {
         if (type === 'school') {
             navigate(`/school/${item.id}`); 
@@ -349,18 +340,16 @@ const Home = () => {
             navigate(`/instructor/${item.id}`);
         } 
         else if (type === 'style') {
-            // Wpisujemy styl i chowamy dropdown
             setSearchQuery(item.style_name);
             setShowSearchDropdown(false);
         }
     };
 
-    // --- !!! KLUCZOWA POPRAWKA ENTERA !!! ---
     const handleEnterSearch = async () => {
         let loc = heroSelectedLocation;
         let cityStr = heroCityInput;
 
-        // Jeśli user wpisał tekst (np. "Wroc"), ale nie wybrał z listy -> pobieramy pierwszy wynik
+        // Jeśli user wpisał tekst (np. "Wroc"), ale nie wybrał z listy -> pobieranie pierwszego wyniku
         if (!loc && cityStr !== 'Cała Polska' && cityStr.length > 1) {
             const suggestions = await getCityData(cityStr);
             if (suggestions.length > 0) {
@@ -369,7 +358,6 @@ const Home = () => {
             }
         }
 
-        // Teraz 'loc' na pewno ma dane (lat, lon, bbox), jeśli miasto istnieje
         goToSearch(searchQuery, loc, cityStr);
     };
 

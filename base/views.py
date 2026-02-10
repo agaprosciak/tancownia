@@ -13,7 +13,6 @@ from django.db.models import Q, Count
 
 from .models import School, DanceClass, Style, Instructor, Review, User, SchoolImage, DanceFloor, PriceList
 
-# UZUPEŁNIONE IMPORTY SERIALIZERÓW
 from .serializers import (
     SchoolSerializer, 
     DanceClassSerializer, 
@@ -50,7 +49,7 @@ class SchoolFilter(dj_filters.FilterSet):
         model = School
         fields = []
 
-    # --- LOGIKA (A or B) AND (C or D) ---
+    # LOGIKA (A or B) AND (C or D)
     def filter_style(self, queryset, name, value):
         vals = self.request.query_params.getlist('style')
         if not vals: return queryset
@@ -169,8 +168,7 @@ class DanceFloorViewSet(viewsets.ModelViewSet):
         except Exception:
             return Response({"error": "Błąd: Najpierw musisz stworzyć szkołę!"}, status=400)
 
-        # KLUCZOWY FIX: Czyścimy stare sale przed zapisem nowych
-        # Dzięki temu "kosz" w React zadziała w bazie, a "tylko jedna sala" wywali resztę
+        #Czyszczenie starych sal przed zapisem nowych
         school.floors.all().delete()
 
         created_rooms = []
@@ -207,16 +205,13 @@ class PriceListViewSet(viewsets.ModelViewSet):
         # 2. Cennik
         school.price_list.all().delete()
         for item in prices_data:
-            # FIX: Use 'entry_type' instead of 'type'
             e_type = item.get('entry_type')
             
             if not e_type:
                 e_type = 'single'
 
-            # FIX: Frontend sends 'entries_per_week', not 'entries'
             entries = item.get('entries_per_week')
             
-            # Logic for unlimited/single
             if item.get('unlimited') or e_type == 'single':
                 entries = None
 
@@ -225,10 +220,8 @@ class PriceListViewSet(viewsets.ModelViewSet):
                 name=item.get('name'),
                 price=item.get('price'),
                 entry_type=e_type, 
-                # FIX: Frontend sends 'duration_minutes', not 'duration'
                 duration_minutes=item.get('duration_minutes') or 60,
                 entries_per_week=entries,
-                # FIX: Frontend sends 'description', not 'details'
                 description=item.get('description', '')
             )
                 
@@ -241,17 +234,11 @@ class DanceClassViewSet(viewsets.ModelViewSet):
     filter_backends = [dj_filters.DjangoFilterBackend] 
     filterset_fields = ['school', 'style', 'day_of_week', 'level', 'min_age']
 
-    # --- USUNĘLIŚMY METODĘ get_queryset ---
-    # Dzięki temu backend zwraca wszystkie zajęcia, o które poprosi frontend 
-    # (np. ?school=5), niezależnie od tego, kim jest zalogowany użytkownik.
-
-    # --- POPRAWIONY ATOMIC CREATE (To zostawiamy bez zmian) ---
     def create(self, request, *args, **kwargs):
         full_data = request.data
         time_slots = full_data.get('time_slots')
 
         if time_slots and isinstance(time_slots, list):
-            # 1. Czyścimy dane z 'time_slots'
             base_data = {k: v for k, v in full_data.items() if k != 'time_slots'}
             
             try:
@@ -278,7 +265,7 @@ class DanceClassViewSet(viewsets.ModelViewSet):
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        # To jest bezpieczne - przy tworzeniu zawsze przypisujemy do szkoły zalogowanego
+        #Przy tworzeniu zawsze przypisujemy do szkoły zalogowanego
         dance_class = serializer.save(school=self.request.user.school)
         instructors = dance_class.instructors.all()
         for inst in instructors:
@@ -312,11 +299,9 @@ class InstructorViewSet(viewsets.ModelViewSet):
             my_only = self.request.query_params.get('my_only') == 'true'
             created_by_me = self.request.query_params.get('created_by_me') == 'true'
 
-            # Jeśli chcesz tylko tych ze swojej szkoły
             if my_only and hasattr(user, 'school'):
                 queryset = queryset.filter(schools=user.school)
 
-            # Jeśli chcesz tylko tych, których sama dodałaś do bazy
             if created_by_me:
                 queryset = queryset.filter(created_by=user)
 
@@ -346,7 +331,6 @@ class ReviewViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Tylko tancerze mogą wystawiać opinie!")
         serializer.save(user=self.request.user)
 
-# Widok rejestracji
 class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
     serializer_class = RegisterSerializer
@@ -357,17 +341,13 @@ class RegisterView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        # 1. Generujemy token
+        # Generujemy token
         refresh = RefreshToken.for_user(user)
         
-        # 2. !!! KLUCZOWY FIX !!! 
-        # Musimy ręcznie dodać dane do ACCESS TOKENA, 
-        # bo RefreshToken.for_user nie używa Twojego MyTokenObtainPairSerializer
         refresh['username'] = user.username
         refresh['role'] = user.role
         refresh['has_school'] = False # Nowy owner nie ma szkoły
 
-        # 3. Przygotowujemy odpowiedź
         return Response({
             "user": serializer.data,
             "access": str(refresh.access_token),
@@ -411,15 +391,12 @@ def custom_change_password(request):
     current_password = request.data.get('current_password')
     new_password = request.data.get('new_password')
 
-    # 1. Sprawdź czy podano hasła
     if not current_password or not new_password:
         return Response({'error': 'Podaj obecne i nowe hasło.'}, status=400)
 
-    # 2. Sprawdź czy obecne hasło jest dobre
     if not user.check_password(current_password):
         return Response({'error': 'Obecne hasło jest nieprawidłowe.'}, status=400)
 
-    # 3. Zmień hasło i zapisz
     try:
         user.set_password(new_password)
         user.save()

@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
-import AuthContext from '../context/AuthContext'; // IMPORTUJEMY CONTEXT
+import AuthContext from '../context/AuthContext';
 
-// --- IMPORT IKON ---
 import fbIcon from '../assets/facebook.png';
 import igIcon from '../assets/instagram.png';
 
-// --- HELPERY ---
 const TextWithLinks = ({ text }) => {
     if (!text) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -25,7 +23,6 @@ const TextWithLinks = ({ text }) => {
     );
 };
 
-// --- KOMPONENTY POMOCNICZE ---
 const StarRating = ({ rating, count, size = '16px' }) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
         <div style={{ display: 'flex' }}>
@@ -43,7 +40,6 @@ const StarRating = ({ rating, count, size = '16px' }) => (
 
 const InteractiveStars = ({ rating, setRating }) => (
     <div style={{ display: 'flex', gap: '5px', cursor: 'pointer' }}>
-        {/*  - contextually relevant but simpler to describe with code */}
         {[1, 2, 3, 4, 5].map((star) => (
             <span key={star} className="material-symbols-outlined" 
                 style={{ color: star <= rating ? '#FFD700' : '#E0E0E0', fontVariationSettings: "'FILL' 1", fontSize: '24px' }}
@@ -67,7 +63,6 @@ const AccordionSection = ({ title, children, defaultOpen = false }) => {
     );
 };
 
-// --- POPUP SZCZEGÓŁÓW CENNIKA ---
 const PriceDetailsPopup = ({ item, onClose }) => {
     if (!item) return null;
 
@@ -126,7 +121,6 @@ const PriceDetailsPopup = ({ item, onClose }) => {
     );
 };
 
-// --- POPUP SZCZEGÓŁÓW ZAJĘĆ ---
 const ClassDetailsPopup = ({ cls, onClose, rooms, allInstructors, navigate, schoolStyles }) => {
     if (!cls) return null;
 
@@ -308,13 +302,11 @@ const ClassDetailsPopup = ({ cls, onClose, rooms, allInstructors, navigate, scho
 };
 
 
-// --- GŁÓWNY KOMPONENT SCHOOL ---
 
 const School = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     
-    // --- UŻYCIE CONTEXTU ---
     const { user } = useContext(AuthContext); 
 
     const [school, setSchool] = useState(null);
@@ -326,7 +318,6 @@ const School = () => {
     const [newReviewRating, setNewReviewRating] = useState(0);
     const [submittingReview, setSubmittingReview] = useState(false);
     
-    // NOWE: Stan do błędów formularza opinii
     const [reviewError, setReviewError] = useState(null);
 
     const [rooms, setRooms] = useState([]);
@@ -341,38 +332,37 @@ const School = () => {
 
     const fetchData = async () => {
         try {
-            // 1. Pobieramy Szkołę
+            //Pobranie szkoły
             const schoolRes = await api.get(`schools/${id}/`);
             const schoolData = schoolRes.data;
             setSchool(schoolData);
 
-            // 2. Pobieramy Grafik
+            // Pobranie grafiku
             const classesRes = await api.get(`classes/?school=${id}`);
             const classesData = classesRes.data;
             setSchedule(classesData);
 
-            // 3. Budujemy Zakładki Sal (Dopiero jak mamy i szkołę i zajęcia)
+            // Zakładki Sal (jak jest i szkoła i zajęcia)
             let allFloors = schoolData.floors || [];
             
-            // --- TU JEST ZMIANA (Punkt 5) ---
-            // Sprawdzamy czy w grafiku faktycznie są zajęcia bez przypisanej sali
+            // Sprawdza, czy w grafiku faktycznie są zajęcia bez przypisanej sali
             const hasClassesWithoutRoom = classesData.some(c => c.floor === null);
 
             if (allFloors.length > 0) {
-                // Jeśli szkoła ma sale, dodajemy "Bez sali" TYLKO JEŚLI są takie zajęcia
+                // Jeśli szkoła ma sale, dodawanie "Bez sali" TYLKO JEŚLI są takie zajęcia
                 if (hasClassesWithoutRoom) {
                     allFloors = [...allFloors, { id: 'no_room', name: 'Bez sali' }];
                 }
                 
-                // Ustawiamy aktywną salę tylko jeśli jeszcze nie jest ustawiona
+                // Ustawianie aktywnej sali tylko jeśli jeszcze nie jest ustawiona
                 if (!activeRoomId) setActiveRoomId(allFloors[0].id); 
             } else {
-                // Jeśli szkoła w ogóle nie zdefiniowała sal, pokazujemy wszystko (widok domyślny)
+                // Jeśli szkoła w ogóle nie zdefiniowała sal, pokaż wszystko (widok domyślny)
                 setActiveRoomId('all'); 
             }
             setRooms(allFloors);
 
-            // 4. Pobieramy Opinie
+            // Pobieranie opinii
             const reviewsRes = await api.get(`reviews/?school=${id}`);
             setReviews(reviewsRes.data.results || reviewsRes.data);
 
@@ -388,7 +378,6 @@ const School = () => {
         fetchData();
     }, [id]);
 
-    // --- SPRAWDZANIE CZY USER JUŻ OCENIŁ ---
     const userHasReviewed = reviews.some(rev => rev.user === user?.user_id);
 
     const scrollGallery = (direction) => {
@@ -404,30 +393,26 @@ const School = () => {
     const handleSubmitReview = async () => {
         setReviewError(null); 
 
-        // 1. Sprawdzamy czy to tancerz
+        //Sprawdzenie czy to tancerz
         if (!user || user.role !== 'user') {
             setReviewError("Tylko zalogowani tancerze mogą wystawiać opinie!");
             return;
         }
         
-        // 2. Sprawdzamy czy wybrano gwiazdki (to musi być obowiązkowe)
+        //Sprawdzenie czy wybrano gwiazdki
         if (newReviewRating === 0) {
             setReviewError("Proszę zaznaczyć gwiazdki!");
             return;
         }
-
-        // --- USUNIĘTO WALIDACJĘ TEKSTU ---
-        // Skoro opis nie jest wymagany, nie blokujemy pustego pola.
         
         setSubmittingReview(true);
         try {
             await api.post('reviews/', {
                 school: id,
                 rating: newReviewRating,
-                description: newReviewText // Może polecieć jako pusty string "", to OK
+                description: newReviewText
             });
             
-            // Sukces
             setNewReviewText('');
             setNewReviewRating(0);
             fetchData(); 
@@ -778,7 +763,7 @@ const School = () => {
                         {/* WIDOCZNOŚĆ TYLKO DLA USER */}
                         {user?.role === 'user' ? (
                             userHasReviewed ? (
-                                // --- SCENARIUSZ: USER JUŻ OCENIŁ (BLOKADA + INFO) ---
+                                // SCENARIUSZ: USER JUŻ OCENIŁ (BLOKADA + INFO)
                                 <div style={styles.alreadyReviewedBox}>
                                     <span className="material-symbols-outlined" style={{fontSize: '20px'}}>check_circle</span>
                                     <div>
@@ -799,11 +784,11 @@ const School = () => {
                                         value={newReviewText}
                                         onChange={(e) => {
                                             setNewReviewText(e.target.value);
-                                            if (reviewError) setReviewError(null); // Czyści błąd przy pisaniu
+                                            if (reviewError) setReviewError(null);
                                         }}
                                     />
                                     
-                                    {/* NOWE: Wyświetlanie błędu nad przyciskiem */}
+                                    {/* Wyświetlanie błędu nad przyciskiem */}
                                     {reviewError && <div style={styles.errorText}>{reviewError}</div>}
 
                                     <button 
@@ -863,7 +848,7 @@ const School = () => {
     );
 };
 
-// --- STYLES ---
+
 const styles = {
     container: { backgroundColor: '#F8F9FF', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingBottom: '60px', fontFamily: "'Inter', sans-serif" },
     loading: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#555' },
@@ -881,7 +866,6 @@ const styles = {
     logoWrapper: { width: '120px', height: '120px', borderRadius: '50%', backgroundColor: 'white', border: '1px solid #eee', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' },
     logo: { width: '100%', height: '100%', objectFit: 'cover' }, 
     
-    // ZMIANA TUTAJ: Styl placeholdera dopasowany do kafelków z SearchResults
     placeholderLogo: { 
         width: '100%', 
         height: '100%', 

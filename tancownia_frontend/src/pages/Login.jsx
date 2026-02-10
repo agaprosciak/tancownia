@@ -1,7 +1,7 @@
 import { useState, useContext } from 'react';
 import AuthContext from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import api from '../api'; // <--- 1. DODANO IMPORT API
+import api from '../api';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -19,10 +19,9 @@ const Login = () => {
         if (result && result.error) {
             setError('Błędny e-mail lub hasło.');
         } else {
-            // --- 2. ZMIENIONA LOGIKA PRZEKIEROWANIA ---
             if (result?.role === 'owner') {
                 try {
-                    // Sprawdzamy czy właściciel ma już szkołę i sale
+                    // Sprawdzenie, czy właściciel ma już szkołę i sale
                     const res = await api.get('schools/my_school/');
                     const hasSchool = res.data && res.data.id;
                     const hasRooms = res.data.floors && res.data.floors.length > 0;
@@ -33,7 +32,6 @@ const Login = () => {
                         navigate('/profile');
                     }
                 } catch (err) {
-                    // Jak błąd (np. 404 brak szkoły), to do profilu żeby założył
                     navigate('/profile');
                 }
             } else {

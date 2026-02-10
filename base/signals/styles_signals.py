@@ -2,9 +2,6 @@ from django.db.models.signals import pre_save, post_save, pre_delete, post_delet
 from django.dispatch import receiver
 from base.models import DanceClass, Instructor
 
-# ============================================
-# HELPERY
-# ============================================
 
 def school_has_style(school, style):
     """Sprawdza, czy szkoła ma jeszcze jakiekolwiek inne klasy danego stylu."""
@@ -14,10 +11,8 @@ def instructor_has_style(instructor, style):
     """Sprawdza, czy instruktor prowadzi jeszcze jakiekolwiek inne klasy danego stylu."""
     return DanceClass.objects.filter(instructors=instructor, style=style).exists()
 
-# ============================================
-# 1. ZMIANA STYLU (Przy edycji zajęć)
-# ============================================
 
+#ZMIANA STYLU (przy edycji zajęć)
 @receiver(pre_save, sender=DanceClass, weak=False)
 def capture_old_style_before_save(sender, instance, **kwargs):
     """Zapamiętuje stary styl przed zapisem, żeby sprawdzić, czy się zmienił."""
@@ -39,35 +34,29 @@ def handle_style_change(sender, instance, created, **kwargs):
     school = instance.school
     new_style = instance.style
     
-    # Zawsze upewnij się, że szkoła ma ten styl
     school.styles.add(new_style)
 
-    # Jeśli zmieniono styl (np. z Salsa na Bachata)
+    # Jeśli zmieniono styl
     if not created and instance._old_style and instance._old_style != new_style:
         old_style = instance._old_style
         
-        # 1. Czyścimy szkołę ze starego stylu (jeśli już go nie uczy)
+        #Czyścimy szkołę ze starego stylu (jeśli już go nie uczy)
         if not school_has_style(school, old_style):
             school.styles.remove(old_style)
             
-        # 2. Czyścimy instruktorów ze starego stylu i dodajemy nowy
-        # Uwaga: instance.instructors.all() tutaj zwróci instruktorów, którzy są już przypisani.
+        #Czyścimy instruktorów ze starego stylu i dodajemy nowy
         for instructor in instance.instructors.all():
-            # Dodaj nowy styl
             instructor.styles.add(new_style)
-            # Usuń stary styl (jeśli nie prowadzi innych zajęć w tym stylu)
             if not instructor_has_style(instructor, old_style):
                 instructor.styles.remove(old_style)
 
-# ============================================
-# 2. ZMIANA INSTRUKTORÓW (Dodawanie/Usuwanie osób)
-# ============================================
 
+#ZMIANA INSTRUKTORÓW (Dodawanie/Usuwanie osób)
 @receiver(m2m_changed, sender=DanceClass.instructors.through, weak=False)
 def handle_instructors_change(sender, instance, action, pk_set, **kwargs):
     """
-    To jest kluczowe! Uruchamia się, gdy dodajesz lub usuwasz instruktorów z zajęć.
-    Działa nawet przy tworzeniu nowych zajęć.
+    Uruchamia się, gdy dodano lub usunięto instruktorów z zajęć.
+    Działa przy tworzeniu nowych zajęć.
     """
     if action == "post_add":
         # Gdy dodano instruktorów -> Przypisz im styl tych zajęć
@@ -88,10 +77,8 @@ def handle_instructors_change(sender, instance, action, pk_set, **kwargs):
             except Instructor.DoesNotExist:
                 continue
 
-# ============================================
-# 3. USUWANIE ZAJĘĆ (Sprzątanie)
-# ============================================
 
+#USUWANIE ZAJĘĆ
 @receiver(pre_delete, sender=DanceClass, weak=False)
 def cache_relations_before_delete(sender, instance, **kwargs):
     """Zapamiętuje powiązania w pamięci RAM, zanim rekord zniknie z bazy."""
@@ -109,11 +96,9 @@ def cleanup_styles_after_delete(sender, instance, **kwargs):
     if not school or not style_to_check:
         return
 
-    # Sprawdź szkołę
     if not school_has_style(school, style_to_check):
         school.styles.remove(style_to_check)
 
-    # Sprawdź instruktorów
     for instructor in instructors:
         if not instructor_has_style(instructor, style_to_check):
             instructor.styles.remove(style_to_check)

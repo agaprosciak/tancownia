@@ -55,7 +55,6 @@ const Instructor = () => {
                         <h2 style={styles.name}>{fullName}</h2>
                         
                         <div style={styles.socialIcons}>
-                            {/* POPRAWKA: Używamy pola 'facebook' z Twojego modelu */}
                             {instructor.facebook && (
                                 <a href={instructor.facebook} target="_blank" rel="noopener noreferrer" style={styles.iconLink}>
                                     <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="#1877F2">
@@ -64,7 +63,6 @@ const Instructor = () => {
                                 </a>
                             )}
 
-                            {/* POPRAWKA: Używamy pola 'instagram' z Twojego modelu */}
                             {instructor.instagram && (
                                 <a href={instructor.instagram} target="_blank" rel="noopener noreferrer" style={styles.iconLink}>
                                     <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24">

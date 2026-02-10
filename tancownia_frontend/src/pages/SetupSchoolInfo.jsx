@@ -86,7 +86,7 @@ const SetupSchoolInfo = () => {
         e.preventDefault();
         setError('');
 
-        // --- 1. WALIDACJA SOCIAL MEDIA ---
+        // --- WALIDACJA SOCIAL MEDIA ---
         if (formData.instagram && (!formData.instagram.toLowerCase().includes('instagram.com') || !formData.instagram.toLowerCase().includes('http'))) {
             setError("Link do Instagrama musi być pełnym adresem (http... instagram.com)");
             return;
@@ -96,7 +96,7 @@ const SetupSchoolInfo = () => {
             return;
         }
 
-        // --- 2. WALIDACJA TELEFONU ---
+        // --- WALIDACJA NR TELEFONU ---
         const cleanPhone = formData.phone.replace(/[\s-]/g, '');
         const phoneRegex = /^(\+48)?\d{9,15}$/; 
         if (formData.phone && !phoneRegex.test(cleanPhone)) {
@@ -104,14 +104,14 @@ const SetupSchoolInfo = () => {
             return;
         }
 
-        // --- 3. KOD POCZTOWY ---
+        // --- KOD POCZTOWY ---
         const zipRegex = /^[0-9]{2}-[0-9]{3}$/;
         if (!zipRegex.test(formData.postal_code)) {
             setError("Kod pocztowy musi być w formacie XX-XXX (np. 35-310).");
             return;
         }
 
-        // --- 4. DŁUGOŚĆ ADRESU ---
+        // --- DŁUGOŚĆ ADRESU ---
         if (formData.city.trim().length < 3) {
             setError("Nazwa miejscowości jest za krótka.");
             return;
@@ -121,18 +121,18 @@ const SetupSchoolInfo = () => {
             return;
         }
 
-        // --- 5. ZNAKI SPECJALNE ---
+        // --- ZNAKI SPECJALNE ---
         const safeTextRegex = /^[a-zA-Z0-9\s\/\-\.,ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+$/;
         if (!safeTextRegex.test(formData.city) || !safeTextRegex.test(formData.street) || !safeTextRegex.test(formData.build_no)) {
             setError("Adres zawiera niedozwolone znaki.");
             return;
         }
 
-        setIsGeocoding(true); // Włączamy loader mapy
+        setIsGeocoding(true);
         let geoData = { lat: '', lon: '', state: '', county: '' };
         
         try {
-            // --- 6. OBOWIĄZKOWE GEOKODOWANIE ---
+            // --- OBOWIĄZKOWE GEOKODOWANIE ---
             const params = new URLSearchParams({
                 format: 'json',
                 addressdetails: 1,
@@ -150,11 +150,11 @@ const SetupSchoolInfo = () => {
             
             const geoResult = await geoResponse.json();
             
-            // JEŚLI NIE ZNALEZIONO ADRESU -> BLOKUJEMY FORMULARZ
+            // JEŚLI NIE ZNALEZIONO ADRESU -> FORMULARZ BLOKOWANY
             if (!geoResult || geoResult.length === 0) {
                 setIsGeocoding(false);
                 setError("Nie znaleziono takiego adresu w Polsce. Sprawdź ulicę, numer i kod pocztowy.");
-                return; // STOP! Nie wysyłamy do backendu
+                return; 
             }
 
             const res = geoResult[0];
@@ -169,16 +169,16 @@ const SetupSchoolInfo = () => {
             console.error("Błąd geokodowania:", err);
             setIsGeocoding(false);
             setError("Wystąpił błąd weryfikacji adresu. Spróbuj ponownie później.");
-            return; // STOP! Błąd połączenia z mapą
+            return;
         }
 
-        setIsGeocoding(false); // Wyłączamy loader mapy, przechodzimy do zapisu
+        setIsGeocoding(false);
 
         // --- PRZYGOTOWANIE DANYCH DO WYSYŁKI ---
         const data = new FormData();
         Object.keys(formData).forEach(key => data.append(key, formData[key].trim()));
 
-        // Nadpisujemy współrzędne - one MUSZĄ tam być
+        // Zapis wpółrzędnych
         data.set('latitude', geoData.lat);
         data.set('longitude', geoData.lon);
         data.set('state', geoData.state);

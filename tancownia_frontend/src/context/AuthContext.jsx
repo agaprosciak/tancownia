@@ -26,7 +26,6 @@ export const AuthProvider = ({ children }) => {
     const [message, setMessage] = useState(null); 
     const navigate = useNavigate();
 
-    // Sprawdzamy komunikaty po przeładowaniu strony (F5)
     useEffect(() => {
         const flashMessage = localStorage.getItem('authMessage');
         if (flashMessage) {
@@ -81,10 +80,9 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         localStorage.removeItem('authTokens');
         
-        // 1. Zapisujemy komunikat
         localStorage.setItem('authMessage', "Wylogowano pomyślnie!"); 
         
-        // 2. ROBIMY TWARDE PRZEŁADOWANIE NA STRONĘ GŁÓWNĄ
+        //PRZEŁADOWANIE NA STRONĘ GŁÓWNĄ
         window.location.href = '/';
     };
 

@@ -4,9 +4,6 @@ from django.db.models.signals import pre_save, post_delete
 from django.dispatch import receiver
 from base.models import User, School, Instructor, SchoolImage
 
-# ==========================================================
-#  1. HELPER DO BEZPIECZNEGO USUWANIA PLIKÓW
-# ==========================================================
 
 def delete_file_if_exists(file_path):
     """Bezpiecznie usuwa plik i jego pusty folder nadrzędny."""
@@ -17,12 +14,7 @@ def delete_file_if_exists(file_path):
             try:
                 os.rmdir(folder)
             except OSError:
-                # Może wystąpić błąd, jeśli inny proces zdążył usunąć folder
                 pass
-
-# ==========================================================
-#  2. GENERYCZNE SYGNAŁY DO ZARZĄDZANIA PLIKAMI
-# ==========================================================
 
 def auto_delete_file_on_change(sender, instance, **kwargs):
     """
@@ -30,20 +22,18 @@ def auto_delete_file_on_change(sender, instance, **kwargs):
     Usuwa stary plik, jeśli został zastąpiony nowym w danym obiekcie.
     """
     if not instance.pk:
-        return  # Obiekt jest nowy, nie ma starego pliku
+        return 
 
     try:
         old_instance = sender.objects.get(pk=instance.pk)
     except sender.DoesNotExist:
-        return  # Na wszelki wypadek
+        return
 
-    # Iterujemy po wszystkich polach modelu, szukając pól obrazów
     for field in sender._meta.fields:
         if isinstance(field, models.ImageField):
             old_file = getattr(old_instance, field.name)
             new_file = getattr(instance, field.name)
             
-            # Jeśli plik się zmienił i stary plik nie jest plikiem domyślnym, usuń go
             if old_file and old_file != new_file and old_file.name != field.default:
                 delete_file_if_exists(old_file.path)
 
@@ -62,9 +52,8 @@ def auto_delete_file_on_delete(sender, instance, **kwargs):
             if file_to_delete and file_to_delete.name != field.default:
                 delete_file_if_exists(file_to_delete.path)
 
-# ==========================================================
-#  3. PODŁĄCZANIE SYGNAŁÓW DO WSZYSTKICH POTRZEBNYCH MODELI
-# ==========================================================
+
+#PODŁĄCZANIE SYGNAŁÓW DO WSZYSTKICH POTRZEBNYCH MODELI
 
 # Lista modeli, które zawierają pliki i mają być objęte automatycznym sprzątaniem
 models_with_files = [User, School, Instructor, SchoolImage]

@@ -17,7 +17,7 @@ const Profile = () => {
     const [showUsernameModal, setShowUsernameModal] = useState(false);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
 
-    // --- FORMULARZE ---
+    // FORMULARZE
     const [newUsername, setNewUsername] = useState('');
     const [currentPasswordForUsername, setCurrentPasswordForUsername] = useState('');
     const [passData, setPassData] = useState({ current_password: '', new_password: '', re_new_password: '' });
@@ -53,7 +53,7 @@ const Profile = () => {
 
     const handleLogout = () => logoutUser();
 
-    // --- LOGIKA ZMIANY NAZWY ---
+    // LOGIKA ZMIANY NAZWY
     const submitUsername = async () => {
         setActionLoading(true);
         setActionMessage(null);
@@ -72,7 +72,7 @@ const Profile = () => {
         }
     };
 
-    // --- LOGIKA ZMIANY HASŁA ---
+    // LOGIKA ZMIANY HASŁA
     const submitPassword = async () => {
         if (passData.new_password !== passData.re_new_password) {
             setActionMessage({ type: 'error', text: 'Nowe hasła muszą być identyczne.' });
@@ -145,7 +145,6 @@ const Profile = () => {
                                 </button>
                             </div>
 
-                            {/* --- NOWE PRZYCISKI DLA OWNERA (ZMIANA DANYCH KONTA) --- */}
                             <div style={{width: '100%', borderTop: '1px solid #eee', paddingTop: '20px', marginTop: '10px'}}>
                                 <p style={{textAlign:'center', color:'#888', fontSize:'14px', marginBottom:'15px', fontWeight:'500'}}>Ustawienia konta</p>
                                 <div style={styles.rowTwo}>
@@ -284,21 +283,18 @@ const styles = {
     logoPlaceholder: { width: '120px', height: '120px', borderRadius: '50%', backgroundColor: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', color: '#888' },
     nameTitle: { fontSize: '28px', fontWeight: '500', color: '#000', marginBottom: '40px', textAlign: 'center' },
     
-    // GRID PRZYCISKÓW DLA SZKOŁY
     buttonsGrid: { display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', maxWidth: '750px' },
     mainActionBtn: { backgroundColor: '#7A33E3', color: 'white', border: 'none', padding: '15px', borderRadius: '4px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', width: '100%', maxWidth: '400px', margin: '0 auto' },
     rowTwo: { display: 'flex', gap: '15px', justifyContent: 'center', width: '100%', flexWrap: 'wrap' },
     rowThree: { display: 'flex', gap: '15px', justifyContent: 'center', width: '100%', flexWrap: 'wrap' },
     purpleBtn: { backgroundColor: '#7A33E3', color: 'white', border: 'none', padding: '15px 25px', borderRadius: '4px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', flex: '1', minWidth: '180px', justifyContent: 'center' },
     
-    // STACK PRZYCISKÓW DLA TANCERZA
     verticalStack: { display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', maxWidth: '400px' },
     purpleBtnWide: { backgroundColor: '#7A33E3', color: 'white', border: 'none', padding: '15px 20px', borderRadius: '4px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', width: '100%' },
     
     logoutContainer: { marginTop: '50px', textAlign: 'center', borderTop: 'none' },
     logoutLink: { fontSize: '18px', fontWeight: '700', color: '#333', textDecoration: 'underline', cursor: 'pointer' },
 
-    // --- POPRAWIONE STYLE MODALA (POPUP) ---
     overlay: { 
         position: 'fixed', 
         top: 0, 

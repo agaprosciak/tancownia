@@ -11,7 +11,7 @@ const ManageSchool = () => {
     const [status, setStatus] = useState({ hasSchool: false, hasRooms: false });
 
     useEffect(() => {
-        // Jeśli user jeszcze się nie wczytał w AuthContext, czekamy
+        // Jeśli user jeszcze się nie wczytał w AuthContext
         if (user === undefined) return; 
 
         if (user?.role !== 'owner') {
@@ -37,10 +37,9 @@ const ManageSchool = () => {
 
     if (loading) return <div style={{padding: '100px', textAlign: 'center'}}>Ładowanie stanu szkoły...</div>;
 
-    // Jeśli to nie owner (np. tancerz wpisał /profile z palca), pokaż mu zwykły profil
+    // Jeśli to nie owner, pokaż zwykły profil
     if (user?.role !== 'owner') return <Profile />;
 
-    // --- KLUCZOWY MOMENT ---
     if (!status.hasSchool) return <SetupSchoolInfo />;
     if (!status.hasRooms) return <SetupRooms />;
 

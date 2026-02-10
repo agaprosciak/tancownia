@@ -24,7 +24,6 @@ function App() {
     const { user, message, setMessage } = useContext(AuthContext);
 
     return (
-        // 2. GŁÓWNY WRAPPER (zamiast <>) - ustawia flexbox dla "Sticky Footer"
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
             
             {/* ALERT BOX */}
@@ -39,7 +38,6 @@ function App() {
 
             <Navbar />
 
-            {/* 3. WRAPPER TREŚCI - wypycha stopkę na dół */}
             <div style={{ flex: 1 }}>
                 <Routes>
                     <Route path="/signup-dancer" element={<Register role="user" />} />
@@ -66,7 +64,6 @@ function App() {
                 </Routes>
             </div>
 
-            {/* 4. STOPKA NA SAMYM DOLE */}
             <Footer />
             
         </div>

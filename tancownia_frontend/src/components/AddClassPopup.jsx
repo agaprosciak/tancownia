@@ -27,7 +27,7 @@ const AddClassPopup = ({ type, rooms, instructors, onClose, onSave, onOpenInstru
         api.get('styles/').then(res => setStylesList(res.data));
     }, []);
 
-    // --- WYPEŁNIANIE DANYCH PRZY EDYCJI ---
+    //WYPEŁNIANIE DANYCH PRZY EDYCJI
     useEffect(() => {
         if (editingClass) {
             const foundStyle = stylesList.find(s => s.id === editingClass.style);
@@ -56,7 +56,6 @@ const AddClassPopup = ({ type, rooms, instructors, onClose, onSave, onOpenInstru
             });
 
             if (isPeriodic) {
-                // Ustawiamy slot na ten jeden edytowany dzień
                 setTimeSlots([{
                     day_of_week: editingClass.day_of_week,
                     starts_at: editingClass.starts_at ? editingClass.starts_at.slice(0,5) : '',
@@ -156,31 +155,26 @@ const AddClassPopup = ({ type, rooms, instructors, onClose, onSave, onOpenInstru
             const existingStyle = stylesList.find(s => normalize(s.style_name) === normalize(inputStyle));
             const styleValue = existingStyle ? existingStyle.id : inputStyle;
 
-            // DANE DO WYSYŁKI
             const basePayload = {
                 ...formData,
                 style: styleValue,
                 periodic: isPeriodic,
                 price: formData.priceFromList ? null : (formData.price || null),
                 max_age: formData.unlimited_age ? null : (formData.max_age || null),
-                // WAŻNE: Jeśli wybrano "Bez sali" (string ""), zamieniamy na null
+                //Jeśli wybrano "Bez sali" (string ""), zamieniamy na null
                 floor: formData.floor ? formData.floor : null,
                 last_class_date: isPeriodic ? null : (isMultiDay ? formData.last_class_date : formData.first_class_date)
             };
 
-            // Dla slotów czasowych też trzeba zadbać o nulle
             const processedTimeSlots = timeSlots.map(slot => ({
                 ...slot,
                 floor: slot.floor ? slot.floor : null
             }));
 
-            // --- 🔥 OPCJA ATOMOWA: USUŃ STARE, DODAJ NOWE 🔥 ---
             if (editingClass) {
-                // 1. Najpierw usuwamy stary rekord
                 await api.delete(`classes/${editingClass.id}/`);
             }
 
-            // 2. Potem tworzymy nowy (czysty start, zero problemów z kolizją ID)
             if (isPeriodic) {
                 // Dla cyklicznych wysyłamy listę slotów
                 await api.post('classes/', { ...basePayload, time_slots: processedTimeSlots });

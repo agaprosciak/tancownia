@@ -14,7 +14,6 @@ const SetupClasses = () => {
     const [stylesList, setStylesList] = useState([]); 
     const [newInstId, setNewInstId] = useState(null); 
     
-    // Sprawdzamy czy edycja z profilu
     const isEditMode = location.state?.fromProfile;
 
     const [classPopupType, setClassPopupType] = useState(null);
@@ -27,16 +26,16 @@ const SetupClasses = () => {
 
     const fetchData = async () => {
         try {
-            // 1. Pobieramy sale
+            // 1. Pobranie sale
             const schoolRes = await api.get('schools/my_school/');
             let allFloors = schoolRes.data.floors;
 
-            // 2. Pobieramy zajęcia
+            // 2. Pobranie zajęć
             const classesRes = await api.get('classes/');
             const fetchedClasses = classesRes.data;
             setClasses(fetchedClasses);
 
-            // 3. Sprawdzamy czy są "sieroty" (bez sali)
+            // 3. Sprawdzanie, czy są zajęcia bez seli
             if (fetchedClasses.some(c => c.floor === null)) {
                 allFloors = [...allFloors, { id: 'no_room', name: 'Bez sali' }];
             }
@@ -78,7 +77,6 @@ const SetupClasses = () => {
         setNewInstId(null);
     };
 
-    // --- HELPERY ---
     const getStyleName = (styleData) => {
         if (!styleData) return '';
         if (typeof styleData === 'string' && isNaN(styleData)) return styleData;
@@ -113,7 +111,7 @@ const SetupClasses = () => {
 
     return (
         <div style={styles.container}>
-            {/* --- ZMODYFIKOWANY NAGŁÓWEK --- */}
+            {/* --- NAGŁÓWEK --- */}
             <div style={styles.headerRow}>
                 {isEditMode && (
                     <span 
@@ -129,7 +127,7 @@ const SetupClasses = () => {
                     {isEditMode ? 'Edytuj zajęcia' : 'Dodaj zajęcia'}
                 </h1>
 
-                {/* Pomiń pokazujemy TYLKO przy rejestracji */}
+                {/* Przycisk pomiń tylko przy rejestracji */}
                 {!isEditMode && (
                     <div style={styles.skipBtnLink} onClick={() => navigate('/profile')}>
                         Pomiń {'>'}
@@ -171,8 +169,8 @@ const SetupClasses = () => {
                                     const isDay = c.day_of_week === day;
                                     const isPeriodic = c.periodic;
                                     
-                                    // Jeśli wybrano zakładkę "Bez sali" (id='no_room'), szukamy nulli.
-                                    // Jeśli wybrano normalną salę, szukamy po ID.
+                                    // Jeśli wybrano zakładkę "Bez sali" (id='no_room'), szukanie nulli.
+                                    // Jeśli wybrano normalną salę, szukanie po ID.
                                     const isRoomMatch = activeRoomId === 'no_room' 
                                         ? c.floor === null 
                                         : c.floor === activeRoomId;
@@ -233,7 +231,6 @@ const SetupClasses = () => {
                         {classes.filter(c => !c.periodic).map(c => (
                             <div key={c.id} style={{
                                 ...styles.eventRow,
-                                // Oznaczamy na czerwono, jeśli nie ma sali
                                 border: c.floor === null ? '2px solid #ff4d4f' : '1px solid #eee'
                             }}>
                                 <div style={{flex: 1, display: 'flex', flexDirection: 'column', gap: '2px'}}>
@@ -272,7 +269,7 @@ const SetupClasses = () => {
             {classPopupType && (
                 <AddClassPopup 
                     type={classPopupType} 
-                    rooms={rooms.filter(r => r.id !== 'no_room')} // Do selecta w popupie nie przekazujemy sztucznej sali, bo dodaliśmy tam opcję "Bez sali" ręcznie
+                    rooms={rooms.filter(r => r.id !== 'no_room')}
                     instructors={instructors}
                     newlyAddedId={newInstId}
                     editingClass={editingClass}
@@ -299,7 +296,6 @@ const SetupClasses = () => {
 const styles = {
     container: { backgroundColor: '#F8F9FF', padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '100vh' },
     
-    // ZMODYFIKOWANY NAGŁÓWEK
     headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: '1200px', marginBottom: '20px' },
     mainTitle: { fontSize: '32px', fontWeight: '500', margin: 0 },
     backArrow: { fontSize: '24px', cursor: 'pointer', color: '#333', fontWeight: 'bold' },

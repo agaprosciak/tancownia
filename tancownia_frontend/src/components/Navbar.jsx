@@ -13,10 +13,9 @@ const Navbar = () => {
     const manageLabel = isOwner ? "Zarządzaj szkołą" : "Zarządzaj profilem";
     const destinationPath = "/profile";
 
-    // Funkcja wylogowania z przeładowaniem
     const handleLogout = () => {
-        setIsUserOpen(false); // Zamykamy dropdown
-        logoutUser(); // To teraz zrobi reload i przeniesie do /login
+        setIsUserOpen(false);
+        logoutUser();
     };
 
     return (

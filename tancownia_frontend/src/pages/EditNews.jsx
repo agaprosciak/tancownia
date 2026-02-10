@@ -7,7 +7,6 @@ const EditNews = () => {
     const [loading, setLoading] = useState(true);
     const [newsText, setNewsText] = useState('');
 
-    // 1. POBIERANIE OBECNYCH AKTUALNOŚCI
     useEffect(() => {
         api.get('schools/my_school/')
             .then(res => {
@@ -19,12 +18,10 @@ const EditNews = () => {
             .finally(() => setLoading(false));
     }, []);
 
-    // 2. ZAPISYWANIE
     const handleSave = async () => {
         try {
-            // Wysyłamy tylko pole 'news'. Backend (metoda PATCH) zaktualizuje tylko to pole.
             await api.patch('schools/my_school/', { news: newsText });
-            navigate('/profile'); // Wracamy do profilu
+            navigate('/profile');
         } catch (err) {
             console.error("Błąd zapisu:", err);
             alert("Nie udało się zapisać aktualności.");
@@ -50,7 +47,6 @@ const EditNews = () => {
             </div>
 
             <div style={styles.card}>
-                {/* Instrukcja na fioletowo */}
                 <p style={styles.purpleText}>
                     Wpisz tutaj ważne komunikaty dla kursantów<br/>
                     (np. “W Wigilię nieczynne”, “Zajęcia Salsy odwołane”).<br/>

@@ -1,22 +1,22 @@
 import { useState, useRef } from 'react';
 import api from '../api';
 
-// 1. Odbieramy initialData (będzie null przy dodawaniu, a obiektem przy edycji)
+//Odbieranie initialData (null przy dodawaniu, obiekt przy edycji)
 const AddInstructorPopup = ({ onClose, onSave, initialData = null }) => {
     
-    // 2. Wypełniamy stan danymi początkowymi (jeśli są)
+    //Wypełnianie stanu danymi początkowymi (jeśli są)
     const [formData, setFormData] = useState({
         first_name: initialData?.first_name || '',
         pseudonym: initialData?.pseudonym || '',
         last_name: initialData?.last_name || '',
         instagram: initialData?.instagram || '',
         facebook: initialData?.facebook || '',
-        photo: null // Plik przesyłamy tylko jak zmieniamy (zostawiamy null na start)
+        photo: null
     });
     
     const [errors, setErrors] = useState({});
     
-    // Ustawiamy podgląd zdjęcia z backendu (jeśli istnieje)
+    // Ustawianie podglądu zdjęcia z backendu (jeśli istnieje)
     const [preview, setPreview] = useState(initialData?.photo || null);
     
     const fileInputRef = useRef(null);
@@ -57,7 +57,7 @@ const AddInstructorPopup = ({ onClose, onSave, initialData = null }) => {
 
         const data = new FormData();
         Object.keys(formData).forEach(key => {
-            // Dodajemy pole tylko jeśli ma wartość (nie wysyłamy nulli, żeby nie nadpisać zdjęcia pustką przy edycji)
+            // Dodawanie pola tylko jeśli ma wartość
             if (formData[key]) {
                 data.append(key, formData[key]);
             }
@@ -65,14 +65,14 @@ const AddInstructorPopup = ({ onClose, onSave, initialData = null }) => {
 
         try {
             let res;
-            // 3. Rozróżniamy Edycję (PATCH) od Dodawania (POST)
+            // Rozróżnianie Edycji (PATCH) od Dodawania (POST)
             if (initialData && initialData.id) {
                 // EDYCJA
                 res = await api.patch(`instructors/${initialData.id}/`, data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             } else {
-                // DODAWANIE NOWEGO
+                // Dodawanie nowego instruktora
                 res = await api.post('instructors/', data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });

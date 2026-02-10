@@ -10,8 +10,7 @@ const MyReviews = () => {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // --- STANY DO EDYCJI ---
-    const [editingId, setEditingId] = useState(null); // ID recenzji, którą edytujemy
+    const [editingId, setEditingId] = useState(null);
     const [editRating, setEditRating] = useState(0);
     const [editText, setEditText] = useState('');
     const [saving, setSaving] = useState(false);
@@ -21,7 +20,6 @@ const MyReviews = () => {
 
         const fetchData = async () => {
             try {
-                // 1. Pobieramy szkoły (do nazw)
                 const schoolsRes = await api.get('schools/');
                 const schoolsMap = {};
                 const schoolsList = schoolsRes.data.results || schoolsRes.data;
@@ -29,14 +27,11 @@ const MyReviews = () => {
                     schoolsMap[school.id] = school.name;
                 });
 
-                // 2. Pobieramy recenzje
                 const reviewsRes = await api.get('reviews/');
                 const allReviews = reviewsRes.data.results || reviewsRes.data;
 
-                // 3. Filtrujemy (bezpieczne porównanie stringów)
                 const myReviewsData = allReviews.filter(r => String(r.user) === String(user.user_id));
 
-                // 4. Łączymy
                 const reviewsWithNames = myReviewsData.map(rev => ({
                     ...rev,
                     schoolName: schoolsMap[rev.school] || 'Szkoła'
@@ -54,7 +49,6 @@ const MyReviews = () => {
         fetchData();
     }, [user]);
 
-    // --- USUWANIE (BEZ PYTANIA) ---
     const handleDelete = async (reviewId) => {
         try {
             await api.delete(`reviews/${reviewId}/`);
@@ -65,31 +59,26 @@ const MyReviews = () => {
         }
     };
 
-    // --- TRYB EDYCJI: START ---
     const startEditing = (review) => {
         setEditingId(review.id);
         setEditRating(review.rating);
         setEditText(review.description);
     };
 
-    // --- TRYB EDYCJI: ANULUJ ---
     const cancelEditing = () => {
         setEditingId(null);
         setEditRating(0);
         setEditText('');
     };
 
-    // --- TRYB EDYCJI: ZAPISZ ---
     const saveEdit = async () => {
         setSaving(true);
         try {
-            // Używamy PATCH, żeby zaktualizować dane
             await api.patch(`reviews/${editingId}/`, {
                 rating: editRating,
                 description: editText
             });
 
-            // Aktualizujemy lokalny stan (żeby od razu widzieć zmiany)
             setReviews(prev => prev.map(r => {
                 if (r.id === editingId) {
                     return { ...r, rating: editRating, description: editText };
@@ -97,7 +86,7 @@ const MyReviews = () => {
                 return r;
             }));
 
-            cancelEditing(); // Wyjście z trybu edycji
+            cancelEditing();
         } catch (err) {
             console.error("Błąd edycji:", err);
             alert("Nie udało się zapisać zmian.");
@@ -124,13 +113,10 @@ const MyReviews = () => {
                     reviews.map(review => (
                         <div key={review.id} style={styles.reviewCard}>
                             
-                            {/* --- CZY EDYTUJEMY TĘ RECENZJĘ? --- */}
                             {editingId === review.id ? (
-                                // --- WIDOK EDYCJI ---
                                 <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
                                     <div style={{fontWeight:'bold', color:'#7A33E3'}}>{review.schoolName}</div>
                                     
-                                    {/* Gwiazdki do edycji */}
                                     <div style={{display:'flex', cursor:'pointer'}}>
                                         {[1,2,3,4,5].map(star => (
                                             <span key={star} className="material-symbols-outlined" 
@@ -154,10 +140,8 @@ const MyReviews = () => {
                                     </div>
                                 </div>
                             ) : (
-                                // --- WIDOK ZWYKŁY ---
                                 <>
                                     <div style={styles.cardHeader}>
-                                        {/* TYLKO NAZWA SZKOŁY (bez ikony) */}
                                         <div style={styles.schoolName} onClick={() => navigate(`/school/${review.school}`)}>
                                             {review.schoolName}
                                         </div>
@@ -226,13 +210,12 @@ const styles = {
         border: '1px solid #eee'
     },
     
-    // HEADER KARTY (bez ikonki szkoły)
     cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' },
     
     schoolName: { 
         fontSize: '18px', 
         fontWeight: '700', 
-        color: '#7A33E3', // Kolor fioletowy dla nazwy
+        color: '#7A33E3',
         cursor: 'pointer',
         textDecoration: 'none'
     },
@@ -252,7 +235,6 @@ const styles = {
     
     emptyState: { textAlign: 'center', padding: '40px', color: '#777' },
 
-    // Style edycji
     editTextarea: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', minHeight: '80px', fontFamily: 'inherit' },
     saveBtn: { backgroundColor: '#7A33E3', color: 'white', border: 'none', padding: '8px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' },
     cancelBtn: { backgroundColor: 'transparent', color: '#555', border: '1px solid #ccc', padding: '8px 20px', borderRadius: '6px', cursor: 'pointer' }

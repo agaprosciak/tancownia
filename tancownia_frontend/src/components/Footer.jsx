@@ -48,14 +48,14 @@ const styles = {
         fontSize: '14px',
         color: '#555',
         width: '100%',
-        padding: '40px 0', // Zmniejszone z 60px na 40px (kompromis)
+        padding: '40px 0',
     },
     container: {
         width: '100%',
-        padding: '0 40px', // Padding boczny bez zmian
+        padding: '0 40px',
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center', // Wyrównanie do środka (wygląda lepiej przy niższej stopce)
+        alignItems: 'center',
         flexWrap: 'wrap',
         gap: '30px',
         boxSizing: 'border-box'
@@ -64,7 +64,7 @@ const styles = {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-start',
-        gap: '12px', // Nieco mniejsze odstępy
+        gap: '12px',
         maxWidth: '450px'
     },
     logoRow: {
@@ -73,7 +73,7 @@ const styles = {
         gap: '12px'
     },
     logoIcon: {
-        height: '36px', // Minimalnie mniejsze logo dla lepszej proporcji
+        height: '36px',
         width: 'auto'
     },
     logoText: {

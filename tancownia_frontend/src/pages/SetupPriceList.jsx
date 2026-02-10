@@ -14,7 +14,6 @@ const SetupPriceList = () => {
         multisport: false, medicover: false, pzu_sport: false, fitprofit: false, info: ''
     });
 
-    // Sprawdzamy czy edycja z profilu
     const isEditMode = location.state?.fromProfile;
 
     const cardLabels = {
@@ -91,7 +90,7 @@ const SetupPriceList = () => {
     return (
         <div style={styles.container}>
             
-            {/* --- ZMODYFIKOWANY NAGŁÓWEK --- */}
+            {/* --- NAGŁÓWEK --- */}
             <div style={styles.header}>
                 {isEditMode && (
                     <span 
@@ -107,12 +106,11 @@ const SetupPriceList = () => {
                     {isEditMode ? 'Edytuj cennik' : 'Dodaj cennik'}
                 </h1>
 
-                {/* Pomiń pokazujemy TYLKO przy rejestracji (gdy NIE ma isEditMode) */}
+                {/* Pomiń TYLKO przy rejestracji (gdy NIE ma isEditMode) */}
                 {!isEditMode && (
                     <span style={styles.skip} onClick={() => navigate('/setup-classes')}>Pomiń &gt;</span>
                 )}
                 
-                {/* Pusty element do balansowania flexa w trybie edycji */}
                 {isEditMode && <div style={{width: '24px'}}></div>}
             </div>
 
@@ -190,7 +188,6 @@ const SetupPriceList = () => {
 const styles = {
     container: { backgroundColor: '#F8F9FF', minHeight: '100vh', padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
     
-    // STYLE NAGŁÓWKA
     header: { width: '100%', maxWidth: '750px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' },
     title: { fontSize: '32px', fontWeight: '400', color: '#333', margin: 0 },
     skip: { cursor: 'pointer', fontWeight: '600', color: '#666', fontSize: '15px' },

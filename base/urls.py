@@ -23,7 +23,6 @@ router.register(r'dancefloors', DanceFloorViewSet, basename='dancefloor')
 router.register(r'price-list', PriceListViewSet, basename='price-list')
 
 urlpatterns = [
-    # 2. DODAJEMY REJESTRACJĘ TUTAJ
     path('register/', RegisterView.as_view(), name='register'),
     path('change-username/', custom_change_username, name='change-username'),
     path('change-password/', custom_change_password, name='change-password'),

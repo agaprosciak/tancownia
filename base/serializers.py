@@ -9,30 +9,27 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def get_token(cls, user):
         token = super().get_token(user)
 
-        # DODAJEMY DANE DO TOKENA (to co przeczyta jwtDecode)
         token['username'] = user.username
         token['role'] = user.role
-        token['has_school'] = hasattr(user, 'school') # Sprawdza czy ma szkołę
+        token['has_school'] = hasattr(user, 'school')
 
         return token
 
 class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        # MUSISZ dodać 'role' tutaj, inaczej Django powie: "Co ty mi tu wysyłasz?"
         fields = ('username', 'email', 'password', 'role') 
         extra_kwargs = {'password': {'write_only': True}}
     
     def validate_role(self, value):
     # Pozwalamy na rejestrację tylko tancerzy i właścicieli
-    # Wykluczamy 'admin', żeby nikt sam sobie nie nadał uprawnień przez API
         allowed_public_roles = ['user', 'owner']
         if value not in allowed_public_roles:
             raise serializers.ValidationError("Nie masz uprawnień, by nadać sobie taką rolę.")
         return value
 
     def create(self, validated_data):
-        # Wyciągamy rolę, jeśli jej nie ma, dajemy 'user'
+        # Pobieramy rolę, jeśli jej nie ma, dajemy 'user'
         role = validated_data.pop('role', 'user')
         
         user = User.objects.create_user(
@@ -77,18 +74,14 @@ class SimpleSchoolSerializer(serializers.ModelSerializer):
 from rest_framework import serializers
 from .models import Instructor, School, Style
 
-# 1. Mały serializer - tylko ID (do linku) i NAZWA (do wyświetlenia)
+# Mały serializer dla szkoły - tylko ID i NAZWA (do wyświetlenia)
 class SimpleSchoolSerializer(serializers.ModelSerializer):
     class Meta:
         model = School
-        fields = ['id', 'name'] # Bez miasta, tak jak chciałaś
+        fields = ['id', 'name']
 
 class InstructorSerializer(serializers.ModelSerializer):
     styles = StyleSerializer(many=True, read_only=True)
-    
-    # 2. Nadpisujemy schools, żeby zwracało listę obiektów, a nie same ID
-    # Dzięki temu frontend dostanie: [{"id": 1, "name": "Szkoła A"}, ...]
-    # I będzie mógł zrobić: navigate(`/school/${school.id}`)
     schools = SimpleSchoolSerializer(many=True, read_only=True)
 
     class Meta:
@@ -97,7 +90,6 @@ class InstructorSerializer(serializers.ModelSerializer):
         read_only_fields = ['schools', 'created_by']
 
 class DanceClassSerializer(serializers.ModelSerializer):
-    # JSONField pozwala przyjąć ID (int) lub nową nazwę (str)
     style = serializers.JSONField() 
     school = serializers.PrimaryKeyRelatedField(read_only=True)
 
@@ -106,12 +98,10 @@ class DanceClassSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate(self, data):
-        # Pobieramy szkołę z kontekstu (widoku)
         request = self.context.get('request')
         user_school = request.user.school
         style_data = data.get('style')
         
-        # Tworzymy atrapę stylu tylko do walidacji clean()
         if isinstance(style_data, int):
             style_obj = Style.objects.filter(id=style_data).first()
         else:
@@ -122,7 +112,6 @@ class DanceClassSerializer(serializers.ModelSerializer):
         temp_data['style'] = style_obj
         temp_data['school'] = user_school
         
-        # Many-to-Many (instruktorzy) wywalamy z atrapy, bo clean() ich nie potrzebuje
         temp_data.pop('instructors', None) 
         
         instance = DanceClass(**temp_data)
@@ -144,10 +133,10 @@ class DanceClassSerializer(serializers.ModelSerializer):
             style_name = str(style_data).strip().capitalize()
             style_obj, created = Style.objects.get_or_create(style_name=style_name)
 
-        # 1. Tworzymy zajęcia
+        # Tworzymy zajęcia
         dance_class = DanceClass.objects.create(style=style_obj, **validated_data)
         
-        # 2. Dodajemy instruktorów przez .set() (wymóg Many-to-Many)
+        # Dodajemy instruktorów przez .set() (wymóg Many-to-Many)
         if instructors_data:
             dance_class.instructors.set(instructors_data)
             
@@ -174,7 +163,6 @@ class SchoolSerializer(serializers.ModelSerializer):
     average_rating = serializers.DecimalField(max_digits=3, decimal_places=2, read_only=True)
     full_address = serializers.CharField(read_only=True)
     
-    # !!! NOWOŚĆ: Pole liczby ocen !!!
     reviews_count = serializers.IntegerField(read_only=True)
 
     class Meta:
@@ -186,9 +174,7 @@ class SchoolSerializer(serializers.ModelSerializer):
             'news', 'accepts_multisport', 'accepts_medicover', 'accepts_fitprofit', 
             'accepts_pzu_sport', 'benefit_cards_info', 'images', 'floors', 
             'instructors', 'price_list', 'styles', 'average_rating', 'full_address',
-            'latitude', 'longitude', 'state', 'county',
-            'classes',
-            'reviews_count'
+            'latitude', 'longitude', 'state', 'county','classes','reviews_count'
         ]
         
         read_only_fields = ['id', 'user', 'average_rating', 'full_address', 'reviews_count']

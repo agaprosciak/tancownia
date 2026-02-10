@@ -31,10 +31,10 @@ const AddPricePopup = ({ onClose, onSave, initialData }) => {
     const validate = () => {
         let errors = {};
         
-        // 1. Nazwa
+        // Nazwa
         if (!formData.name.trim()) errors.name = "Podaj nazwę.";
         
-        // 2. Czas trwania (Musi być dodatni!)
+        // Czas trwania
         const durNum = parseInt(formData.duration_minutes);
         if (!formData.duration_minutes) {
             errors.duration_minutes = "Podaj czas trwania.";
@@ -42,7 +42,7 @@ const AddPricePopup = ({ onClose, onSave, initialData }) => {
             errors.duration_minutes = "Czas musi być dodatni.";
         }
         
-        // 3. Cena (DecimalField max_digits=8)
+        // Cena
         const priceNum = parseFloat(formData.price);
         if (!formData.price) {
             errors.price = "Cena jest wymagana.";
@@ -52,7 +52,7 @@ const AddPricePopup = ({ onClose, onSave, initialData }) => {
             errors.price = "Kwota zbyt wysoka.";
         }
 
-        // 4. Wejścia (Tylko dla karnetu i nie-unlimited)
+        // Wejścia (Tylko dla karnetu i nie-unlimited)
         if (type === 'pass' && !formData.unlimited) {
             const entNum = parseInt(formData.entries_per_week);
             if (!formData.entries_per_week) {
@@ -133,7 +133,7 @@ const AddPricePopup = ({ onClose, onSave, initialData }) => {
                                     min="1"
                                     disabled={formData.unlimited}
                                     style={{...styles.input, flex: 1, borderColor: fieldErrors.entries_per_week ? '#ff4d4f' : '#E0E0E0'}} 
-                                    value={formData.entries_per_week} // DODANE VALUE
+                                    value={formData.entries_per_week}
                                     onChange={e => setFormData({...formData, entries_per_week: e.target.value})} 
                                 />
                                 <label style={styles.checkLabel}>

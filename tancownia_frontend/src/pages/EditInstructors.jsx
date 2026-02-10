@@ -17,8 +17,6 @@ const EditInstructors = () => {
 
     const fetchInstructors = async () => {
         try {
-            // --- TU BYŁA ZMIANA ---
-            // Używamy 'created_by_me=true', żeby pobrać tylko tych, których TY dodałaś.
             const res = await api.get('instructors/?created_by_me=true');
             setInstructors(res.data);
         } catch (err) {

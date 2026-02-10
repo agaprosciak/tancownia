@@ -25,7 +25,7 @@ const getCityData = async (query) => {
     } catch (err) { return []; }
 };
 
-// --- KOMPONENTY UI ---
+
 const SearchBar = ({ searchQuery, setSearchQuery, searchSuggestions, showSearchDropdown, setShowSearchDropdown, handleMainSearch, handleResultClick, heroCityInput, handleHeroCityInput, heroCitySuggestions, showHeroCityDropdown, selectHeroCity, onSubmit, setShowHeroCityDropdown }) => {
     const searchWrapperRef = useRef(null);
     const heroCityWrapperRef = useRef(null);
@@ -92,12 +92,10 @@ const SearchResults = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // --- STATES ---
     const [loading, setLoading] = useState(true);
     const [schools, setSchools] = useState([]);
     const [totalResults, setTotalResults] = useState(0);
     
-    // Inputs
     const [query, setQuery] = useState(searchParams.get('q') || '');
     const [locationName, setLocationName] = useState(searchParams.get('city') || 'Cała Polska');
     const [appliedQuery, setAppliedQuery] = useState(searchParams.get('q') || '');
@@ -105,7 +103,6 @@ const SearchResults = () => {
     const [geoData, setGeoData] = useState({ lat: searchParams.get('lat'), lon: searchParams.get('lon'), bbox: searchParams.get('bbox') });
     const [range50km, setRange50km] = useState(searchParams.get('radius') === '50');
 
-    // Filters
     const [searchType, setSearchType] = useState(searchParams.get('type') || 'all');
     const [selectedStyles, setSelectedStyles] = useState(searchParams.getAll('style'));
     const [age, setAge] = useState(searchParams.get('age') || '');
@@ -143,6 +140,7 @@ const SearchResults = () => {
     const daysList = [{ id: 'mon', label: 'Pon.' }, { id: 'tue', label: 'Wt.' }, { id: 'wed', label: 'Śr.' }, { id: 'thu', label: 'Czw.' }, { id: 'fri', label: 'Pt.' }, { id: 'sat', label: 'Sob.' }, { id: 'sun', label: 'Niedz.' }];
 
     useEffect(() => {
+        window.scrollTo(0, 0);
         const fetchInitialData = async () => {
             try {
                 const [schoolsRes, instRes, stylesRes] = await Promise.all([
@@ -160,7 +158,7 @@ const SearchResults = () => {
         fetchInitialData();
     }, []);
 
-    // --- LOGIKA WYSZUKIWANIA I KONWERSJI NA TAGI ---
+    // LOGIKA WYSZUKIWANIA I KONWERSJI NA TAGI
     useEffect(() => {
         if (query && dynamicStyles.length > 0) {
             const lowerQuery = query.toLowerCase();
@@ -175,12 +173,10 @@ const SearchResults = () => {
         }
     }, [query, dynamicStyles]); 
 
-    // --- JEDNA, POPRAWNA FUNKCJA SEARCH ---
     const handleSearchSubmit = async () => {
         setShowSearchDropdown(false);
         setShowCityDropdown(false);
 
-        // --- RESET JEŚLI PUSTO ---
         if ((!query || query.trim() === '') && (!locationName || locationName === 'Cała Polska' || locationName.trim() === '')) {
             setSelectedStyles([]);
             setSelectedLevels([]);
@@ -199,7 +195,7 @@ const SearchResults = () => {
             return;
         }
 
-        // --- STANDARDOWE WYSZUKIWANIE ---
+        // STANDARDOWE WYSZUKIWANIE
         if (query) setAppliedQuery(query);
 
         if (locationName && locationName !== 'Cała Polska' && (!geoData.lat || !geoData.bbox || locationName !== appliedLocation)) {
@@ -220,7 +216,7 @@ const SearchResults = () => {
         }
     };
 
-    // --- AKTUALIZACJA URL ---
+    // AKTUALIZACJA URL
     useEffect(() => {
         const params = new URLSearchParams();
         if (appliedQuery) params.set('q', appliedQuery);
@@ -250,7 +246,6 @@ const SearchResults = () => {
         fetchResults();
     }, [sortBy, selectedStyles, selectedLevels, selectedForms, selectedDays, selectedCards, timeRange, range50km, age, geoData, appliedQuery, appliedLocation, searchType]); 
 
-    // --- FETCH (Z DEDUPLIKACJĄ) ---
     const fetchResults = async () => {
         setLoading(true);
         try {
@@ -294,21 +289,18 @@ const SearchResults = () => {
 
             const res = await api.get(`schools/?${queryString.toString()}`);
             
-            // --- POPRAWKA: DEDUPLIKACJA ---
             const rawData = res.data.results || res.data;
-            // Filtrujemy, zostawiając tylko PIERWSZE wystąpienie danej szkoły (ID).
+            // Filtrowanie, tylko PIERWSZE wystąpienie danej szkoły (ID).
             const uniqueSchools = rawData.filter((school, index, self) => 
                 index === self.findIndex((s) => s.id === school.id)
             );
 
             setSchools(uniqueSchools);
-            // Ustawiamy licznik na liczbę unikalnych szkół (żeby nie pisało 8 wyników, jak wyświetla 1)
             setTotalResults(uniqueSchools.length);
 
         } catch (err) { console.error("Error search:", err); } finally { setLoading(false); }
     };
 
-    // --- HELPER DO FILTROWANIA ZAJĘĆ ---
     const getFilteredClasses = (school) => {
         if (!school.classes) return [];
         const today = new Date().toISOString().split('T')[0];
@@ -342,7 +334,7 @@ const SearchResults = () => {
         });
     };
 
-    // --- GRUPOWANIE WYNIKÓW ---
+    // GRUPOWANIE WYNIKÓW
     const { schoolsWithMatches, schoolsNoSchedule } = useMemo(() => {
         const matches = [];
         const noSchedule = [];
@@ -356,7 +348,7 @@ const SearchResults = () => {
             } else {
                 // 2. Backend zwrócił szkołę, ale nie ma ona konkretnych zajęć pasujących do filtrów
                 // (np. ma Zaawansowany, ale nie Commercial, a user zaznaczył oba).
-                // WRZUCAMY DO "INNE" ŻEBY NIE BYŁO PUSTEGO EKRANU PRZY WYNIKU > 0.
+                // WYŚWIETLANIE W "INNE" ŻEBY NIE BYŁO PUSTEGO EKRANU PRZY WYNIKU > 0.
                 noSchedule.push(school);
             }
         });
