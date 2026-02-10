@@ -26,16 +26,16 @@ const SetupClasses = () => {
 
     const fetchData = async () => {
         try {
-            // 1. Pobranie sale
+            // 1. Pobranie sal
             const schoolRes = await api.get('schools/my_school/');
             let allFloors = schoolRes.data.floors;
 
             // 2. Pobranie zajęć
-            const classesRes = await api.get('classes/');
+            const classesRes = await api.get('classes/?my_classes=true');
             const fetchedClasses = classesRes.data;
             setClasses(fetchedClasses);
 
-            // 3. Sprawdzanie, czy są zajęcia bez seli
+            // 3. Sprawdzanie, czy są zajęcia bez sali
             if (fetchedClasses.some(c => c.floor === null)) {
                 allFloors = [...allFloors, { id: 'no_room', name: 'Bez sali' }];
             }
@@ -67,7 +67,19 @@ const SetupClasses = () => {
     };
 
     const handleEdit = (cls) => {
-        setEditingClass(cls);
+        const classToEdit = { ...cls };
+
+        if (classToEdit.style && typeof classToEdit.style === 'object') {
+            classToEdit.style = classToEdit.style.id;
+        }
+
+        if (classToEdit.instructors && Array.isArray(classToEdit.instructors)) {
+            classToEdit.instructors = classToEdit.instructors.map(inst => 
+                (typeof inst === 'object' && inst.id) ? inst.id : inst
+            );
+        }
+
+        setEditingClass(classToEdit);
         setClassPopupType(cls.periodic ? 'regular' : 'onetime');
     };
 
@@ -79,7 +91,18 @@ const SetupClasses = () => {
 
     const getStyleName = (styleData) => {
         if (!styleData) return '';
+
+        if (typeof styleData === 'object' && styleData.style_name) {
+            return styleData.style_name;
+        }
+
+        if (typeof styleData === 'object' && styleData.id) {
+             const found = stylesList.find(s => s.id === styleData.id);
+             return found ? found.style_name : 'Nieznany styl';
+        }
+
         if (typeof styleData === 'string' && isNaN(styleData)) return styleData;
+
         const found = stylesList.find(s => String(s.id) === String(styleData));
         return found ? found.style_name : 'Nieznany styl';
     };

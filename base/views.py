@@ -229,10 +229,21 @@ class PriceListViewSet(viewsets.ModelViewSet):
     
 class DanceClassViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
+    # Domyślny queryset (dla listy publicznej/anonimowej)
     queryset = DanceClass.objects.all().order_by('starts_at')
     serializer_class = DanceClassSerializer
     filter_backends = [dj_filters.DjangoFilterBackend] 
     filterset_fields = ['school', 'style', 'day_of_week', 'level', 'min_age']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        my_classes = self.request.query_params.get('my_classes')
+        
+        if my_classes == 'true' and self.request.user.is_authenticated and hasattr(self.request.user, 'school'):
+            return queryset.filter(school=self.request.user.school)
+            
+        return queryset
 
     def create(self, request, *args, **kwargs):
         full_data = request.data
@@ -265,19 +276,15 @@ class DanceClassViewSet(viewsets.ModelViewSet):
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        #Przy tworzeniu zawsze przypisujemy do szkoły zalogowanego
+        # Przy tworzeniu zawsze przypisujemy do szkoły zalogowanego
+        if not hasattr(self.request.user, 'school'):
+             raise PermissionDenied("Musisz mieć profil szkoły, aby tworzyć zajęcia.")
+             
         dance_class = serializer.save(school=self.request.user.school)
         instructors = dance_class.instructors.all()
         for inst in instructors:
             if self.request.user.school not in inst.schools.all():
                 inst.schools.add(self.request.user.school)
-    def perform_create(self, serializer):
-        dance_class = serializer.save(school=self.request.user.school)
-        instructors = dance_class.instructors.all()
-        for inst in instructors:
-            if self.request.user.school not in inst.schools.all():
-                inst.schools.add(self.request.user.school)
-
 
 class StyleViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [AllowAny]
