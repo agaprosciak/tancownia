@@ -1,3 +1,4 @@
+import math
 from django_filters import rest_framework as dj_filters
 from rest_framework import viewsets, filters, generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly, IsAuthenticated
@@ -6,10 +7,10 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view, permission_classes
-from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.db.models import Q, Count
 
-# UZUPEŁNIONE IMPORTY MODELI
+
 from .models import School, DanceClass, Style, Instructor, Review, User, SchoolImage, DanceFloor, PriceList
 
 # UZUPEŁNIONE IMPORTY SERIALIZERÓW
@@ -25,98 +26,132 @@ from .serializers import (
     PriceListSerializer
 )
 
-# Definiujemy zaawansowany filtr dla wyszukiwarki
 class SchoolFilter(dj_filters.FilterSet):
+    bbox = dj_filters.CharFilter(method='filter_by_bbox')
+    radius = dj_filters.NumberFilter(method='filter_by_radius')
     city = dj_filters.CharFilter(lookup_expr='icontains')
+    lat = dj_filters.NumberFilter(method='filter_ignore')
+    lon = dj_filters.NumberFilter(method='filter_ignore')
+
     multisport = dj_filters.BooleanFilter(field_name='accepts_multisport')
     medicover = dj_filters.BooleanFilter(field_name='accepts_medicover')
     fitprofit = dj_filters.BooleanFilter(field_name='accepts_fitprofit')
     pzu_sport = dj_filters.BooleanFilter(field_name='accepts_pzu_sport')
 
-    style = dj_filters.AllValuesMultipleFilter(field_name='classes__style__style_name')
-    level = dj_filters.AllValuesMultipleFilter(field_name='classes__level')
-    group_type = dj_filters.AllValuesMultipleFilter(field_name='classes__group_type')
-    day = dj_filters.AllValuesMultipleFilter(field_name='classes__day_of_week')
-
+    style = dj_filters.CharFilter(method='filter_style')
+    level = dj_filters.CharFilter(method='filter_level')
+    group_type = dj_filters.CharFilter(method='filter_group_type')
+    day = dj_filters.CharFilter(method='filter_day')
     age = dj_filters.NumberFilter(method='filter_age')
-    time_min = dj_filters.TimeFilter(field_name='classes__starts_at', lookup_expr='gte')
-    time_max = dj_filters.TimeFilter(field_name='classes__starts_at', lookup_expr='lte')
+    time_start = dj_filters.CharFilter(method='filter_time_start')
+    time_end = dj_filters.CharFilter(method='filter_time_end')
 
     class Meta:
         model = School
         fields = []
 
+    # --- LOGIKA (A or B) AND (C or D) ---
+    def filter_style(self, queryset, name, value):
+        vals = self.request.query_params.getlist('style')
+        if not vals: return queryset
+        query = Q()
+        for v in vals: query |= Q(classes__style__style_name__iexact=v)
+        return queryset.filter(query).distinct()
+
+    def filter_level(self, queryset, name, value):
+        vals = self.request.query_params.getlist('level')
+        if not vals: return queryset
+        query = Q()
+        for v in vals: query |= Q(classes__level__iexact=v)
+        return queryset.filter(query).distinct()
+
+    def filter_group_type(self, queryset, name, value):
+        vals = self.request.query_params.getlist('group_type')
+        if not vals: return queryset
+        query = Q()
+        for v in vals: query |= Q(classes__group_type__iexact=v)
+        return queryset.filter(query).distinct()
+
+    def filter_day(self, queryset, name, value):
+        day_mapping = {'mon': 'monday', 'tue': 'tuesday', 'wed': 'wednesday', 'thu': 'thursday', 'fri': 'friday', 'sat': 'saturday', 'sun': 'sunday'}
+        days_param = self.request.query_params.getlist('day')
+        if not days_param: return queryset
+        query = Q()
+        for d in days_param:
+            mapped = day_mapping.get(d, d)
+            query |= Q(classes__day_of_week__iexact=mapped)
+        return queryset.filter(query).distinct()
+
+    def filter_time_start(self, queryset, name, value):
+        if not value: return queryset
+        return queryset.filter(classes__starts_at__gte=value).distinct()
+
+    def filter_time_end(self, queryset, name, value):
+        if not value: return queryset
+        return queryset.filter(classes__starts_at__lte=value).distinct()
+
     def filter_age(self, queryset, name, value):
-        return queryset.filter(
-            classes__min_age__lte=value
-        ).filter(
-            dj_filters.Q(classes__max_age__gte=value) | dj_filters.Q(classes__max_age__isnull=True)
-        ).distinct()
+        return queryset.filter(classes__min_age__lte=value).filter(Q(classes__max_age__gte=value) | Q(classes__max_age__isnull=True)).distinct()
+
+    def filter_by_bbox(self, queryset, name, value):
+        try:
+            parts = [float(x) for x in value.split(',')]
+            if len(parts) == 4:
+                min_lat, max_lat, min_lon, max_lon = parts
+                return queryset.filter(latitude__gte=min_lat, latitude__lte=max_lat, longitude__gte=min_lon, longitude__lte=max_lon)
+        except ValueError: pass
+        return queryset
+
+    def filter_by_radius(self, queryset, name, value):
+        lat = self.request.query_params.get('lat')
+        lon = self.request.query_params.get('lon')
+        if not lat or not lon or not value: return queryset
+        try:
+            center_lat, center_lon, radius_km = float(lat), float(lon), float(value)
+            delta_lat = radius_km / 111.0
+            cos_lat = abs(math.cos(math.radians(center_lat))) or 0.0001
+            delta_lon = radius_km / (111.0 * cos_lat)
+            return queryset.filter(latitude__gte=center_lat - delta_lat, latitude__lte=center_lat + delta_lat, longitude__gte=center_lon - delta_lon, longitude__lte=center_lon + delta_lon)
+        except ValueError: return queryset
+
+    def filter_ignore(self, queryset, name, value): return queryset
 
 class SchoolViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
-    queryset = School.objects.all().distinct().order_by('-average_rating')
     serializer_class = SchoolSerializer
-    filter_backends = [dj_filters.DjangoFilterBackend, filters.SearchFilter]
+    filter_backends = [dj_filters.DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = SchoolFilter
-    search_fields = ['name', 'description', 'classes__subtitle']
+    search_fields = ['name', 'classes__style__style_name']
+    ordering_fields = ['average_rating', 'name', 'created_at', 'classes__first_class_date']
+    ordering = ['-average_rating']
+
+    def get_queryset(self):
+        queryset = School.objects.all().annotate(reviews_count=Count('reviews', distinct=True)).distinct()
+        queryset = queryset.prefetch_related('classes__style', 'images', 'floors', 'instructors', 'price_list', 'styles')
+        return queryset
 
     def perform_create(self, serializer):
-        # 1. Zapisujemy podstawowe dane szkoły (w tym logo)
         school = serializer.save(user=self.request.user)
-
-        # 2. Wyciągamy listę plików z galerii (uploaded_images z React)
         images = self.request.FILES.getlist('uploaded_images')
-        
-        # 3. Tworzymy rekordy w modelu SchoolImage dla każdego zdjęcia
-        for image in images:
-            SchoolImage.objects.create(school=school, image=image)
+        for image in images: SchoolImage.objects.create(school=school, image=image)
 
     @action(detail=False, methods=['get', 'put', 'patch'], url_path='my_school')
     def my_school(self, request):
-        """
-        Endpoint do pobierania i EDYCJI szkoły zalogowanego użytkownika.
-        """
         user = request.user
-        
-        # Sprawdzamy, czy user w ogóle ma szkołę
-        if not hasattr(user, 'school'):
-            return Response({"detail": "Nie utworzono jeszcze szkoły."}, status=status.HTTP_404_NOT_FOUND)
-
+        if not hasattr(user, 'school'): return Response({"detail": "Nie utworzono jeszcze szkoły."}, status=status.HTTP_404_NOT_FOUND)
         school = user.school
-
-        # --- SCENARIUSZ 1: POBIERANIE DANYCH (GET) ---
         if request.method == 'GET':
             serializer = self.get_serializer(school)
             return Response(serializer.data)
-
-        # --- SCENARIUSZ 2: EDYCJA DANYCH (PUT / PATCH) ---
         elif request.method in ['PUT', 'PATCH']:
             serializer = self.get_serializer(school, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-
-            # --- DODAWANIE NOWYCH ZDJĘĆ ---
-            # Tu używamy bezpiecznego sprawdzenia, bo przy JSON request.FILES jest puste
             if hasattr(request.FILES, 'getlist'):
                 images = request.FILES.getlist('uploaded_images')
-                if images:
-                    for img in images:
-                        SchoolImage.objects.create(school=school, image=img)
-
-            # --- USUWANIE ZDJĘĆ Z GALERII (TU BYŁ BŁĄD) ---
-            # NAPRAWA: Sprawdzamy, czy request.data to Formularz (ma getlist) czy JSON (nie ma)
-            if hasattr(request.data, 'getlist'):
-                # To przychodzi z SetupSchoolInfo (FormData)
-                deleted_ids = request.data.getlist('deleted_images')
-            else:
-                # To przychodzi z News (JSON) - tu nie ma getlist, używamy zwykłego get
-                deleted_ids = request.data.get('deleted_images', [])
-
-            if deleted_ids:
-                # Konwertujemy na inty i usuwamy
-                SchoolImage.objects.filter(id__in=deleted_ids, school=school).delete()
-
+                for img in images: SchoolImage.objects.create(school=school, image=img)
+            deleted_ids = request.data.getlist('deleted_images') if hasattr(request.data, 'getlist') else request.data.get('deleted_images', [])
+            if deleted_ids: SchoolImage.objects.filter(id__in=deleted_ids, school=school).delete()
             return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -206,14 +241,11 @@ class DanceClassViewSet(viewsets.ModelViewSet):
     filter_backends = [dj_filters.DjangoFilterBackend] 
     filterset_fields = ['school', 'style', 'day_of_week', 'level', 'min_age']
 
-    def get_queryset(self):
-        user = self.request.user
-        if user.is_authenticated and hasattr(user, 'role') and user.role == 'owner':
-            if hasattr(user, 'school'):
-                return self.queryset.filter(school=user.school)
-        return self.queryset.all()
+    # --- USUNĘLIŚMY METODĘ get_queryset ---
+    # Dzięki temu backend zwraca wszystkie zajęcia, o które poprosi frontend 
+    # (np. ?school=5), niezależnie od tego, kim jest zalogowany użytkownik.
 
-    # --- POPRAWIONY ATOMIC CREATE ---
+    # --- POPRAWIONY ATOMIC CREATE (To zostawiamy bez zmian) ---
     def create(self, request, *args, **kwargs):
         full_data = request.data
         time_slots = full_data.get('time_slots')
@@ -228,27 +260,30 @@ class DanceClassViewSet(viewsets.ModelViewSet):
                     for slot in time_slots:
                         merged_data = {**base_data, **slot}
                         
-                        # --- FIX NA BŁĄD 400: DODAJE SZKOŁĘ PRZED WALIDACJĄ ---
-                        # Serializer musi widzieć szkołę, żeby is_valid() przeszedł
                         if hasattr(request.user, 'school') and request.user.school:
                             merged_data['school'] = request.user.school.id
                         
                         serializer = self.get_serializer(data=merged_data)
                         serializer.is_valid(raise_exception=True)
                         
-                        # Zapisujemy (perform_create też doda szkołę, ale to dla pewności)
                         self.perform_create(serializer)
                         created_objects.append(serializer.data)
                 
                 return Response(created_objects, status=status.HTTP_201_CREATED)
             
             except Exception as e:
-                # Zwracamy treść błędu (np. kolizja w Sali 1)
                 error_detail = getattr(e, 'detail', str(e))
                 return Response(error_detail, status=status.HTTP_400_BAD_REQUEST)
 
         return super().create(request, *args, **kwargs)
 
+    def perform_create(self, serializer):
+        # To jest bezpieczne - przy tworzeniu zawsze przypisujemy do szkoły zalogowanego
+        dance_class = serializer.save(school=self.request.user.school)
+        instructors = dance_class.instructors.all()
+        for inst in instructors:
+            if self.request.user.school not in inst.schools.all():
+                inst.schools.add(self.request.user.school)
     def perform_create(self, serializer):
         dance_class = serializer.save(school=self.request.user.school)
         instructors = dance_class.instructors.all()

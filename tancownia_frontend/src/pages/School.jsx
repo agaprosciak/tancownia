@@ -43,6 +43,7 @@ const StarRating = ({ rating, count, size = '16px' }) => (
 
 const InteractiveStars = ({ rating, setRating }) => (
     <div style={{ display: 'flex', gap: '5px', cursor: 'pointer' }}>
+        {/*  - contextually relevant but simpler to describe with code */}
         {[1, 2, 3, 4, 5].map((star) => (
             <span key={star} className="material-symbols-outlined" 
                 style={{ color: star <= rating ? '#FFD700' : '#E0E0E0', fontVariationSettings: "'FILL' 1", fontSize: '24px' }}
@@ -340,21 +341,38 @@ const School = () => {
 
     const fetchData = async () => {
         try {
+            // 1. Pobieramy Szkołę
             const schoolRes = await api.get(`schools/${id}/`);
-            setSchool(schoolRes.data);
+            const schoolData = schoolRes.data;
+            setSchool(schoolData);
 
-            let allFloors = schoolRes.data.floors || [];
+            // 2. Pobieramy Grafik
+            const classesRes = await api.get(`classes/?school=${id}`);
+            const classesData = classesRes.data;
+            setSchedule(classesData);
+
+            // 3. Budujemy Zakładki Sal (Dopiero jak mamy i szkołę i zajęcia)
+            let allFloors = schoolData.floors || [];
+            
+            // --- TU JEST ZMIANA (Punkt 5) ---
+            // Sprawdzamy czy w grafiku faktycznie są zajęcia bez przypisanej sali
+            const hasClassesWithoutRoom = classesData.some(c => c.floor === null);
+
             if (allFloors.length > 0) {
-                allFloors = [...allFloors, { id: 'no_room', name: 'Bez sali' }];
+                // Jeśli szkoła ma sale, dodajemy "Bez sali" TYLKO JEŚLI są takie zajęcia
+                if (hasClassesWithoutRoom) {
+                    allFloors = [...allFloors, { id: 'no_room', name: 'Bez sali' }];
+                }
+                
+                // Ustawiamy aktywną salę tylko jeśli jeszcze nie jest ustawiona
                 if (!activeRoomId) setActiveRoomId(allFloors[0].id); 
             } else {
+                // Jeśli szkoła w ogóle nie zdefiniowała sal, pokazujemy wszystko (widok domyślny)
                 setActiveRoomId('all'); 
             }
             setRooms(allFloors);
 
-            const classesRes = await api.get(`classes/?school=${id}`);
-            setSchedule(classesRes.data);
-
+            // 4. Pobieramy Opinie
             const reviewsRes = await api.get(`reviews/?school=${id}`);
             setReviews(reviewsRes.data.results || reviewsRes.data);
 
@@ -862,7 +880,19 @@ const styles = {
     logoRow: { display: 'flex', gap: '25px', alignItems: 'center', marginBottom: '25px' },
     logoWrapper: { width: '120px', height: '120px', borderRadius: '50%', backgroundColor: 'white', border: '1px solid #eee', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' },
     logo: { width: '100%', height: '100%', objectFit: 'cover' }, 
-    placeholderLogo: { fontSize: '50px', color: '#7A33E3', fontWeight: 'bold' },
+    
+    // ZMIANA TUTAJ: Styl placeholdera dopasowany do kafelków z SearchResults
+    placeholderLogo: { 
+        width: '100%', 
+        height: '100%', 
+        backgroundColor: '#eee', 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        fontSize: '50px', 
+        color: '#888', 
+        fontWeight: 'bold' 
+    },
     
     schoolName: { fontSize: '32px', fontWeight: '800', color: '#333', margin: '0 0 10px 0', lineHeight: 1.1 },
     addressBox: { display: 'flex', alignItems: 'center', gap: '8px', color: '#555', marginTop: '10px', fontSize: '15px' },

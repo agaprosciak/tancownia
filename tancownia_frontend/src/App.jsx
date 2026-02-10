@@ -16,13 +16,18 @@ import Instructor from './pages/Instructor';
 import School from './pages/School';
 import MyReviews from './pages/MyReviews';
 import SearchResults from './pages/SearchResults';
+import Footer from './components/Footer';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 
 function App() {
-    const { user, message, setMessage } = useContext(AuthContext); // Wyciągamy message
+    const { user, message, setMessage } = useContext(AuthContext);
 
     return (
-        <>
-            {/* ALERT BOX - Pojawia się na górze strony */}
+        // 2. GŁÓWNY WRAPPER (zamiast <>) - ustawia flexbox dla "Sticky Footer"
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+            
+            {/* ALERT BOX */}
             {message && (
                 <div style={styles.alert}>
                     <span>{message}</span>
@@ -33,29 +38,38 @@ function App() {
             )}
 
             <Navbar />
-            <Routes>
-                <Route path="/signup-dancer" element={<Register role="user" />} />
-                <Route path="/signup-school" element={<Register role="owner" />} />
 
-                <Route path="/profile" element={<ManageSchool />} />
+            {/* 3. WRAPPER TREŚCI - wypycha stopkę na dół */}
+            <div style={{ flex: 1 }}>
+                <Routes>
+                    <Route path="/signup-dancer" element={<Register role="user" />} />
+                    <Route path="/signup-school" element={<Register role="owner" />} />
 
-                <Route path="/setup-info" element={<SetupSchoolInfo />} />
-                <Route path="/setup-rooms" element={<SetupRooms />} />
-                <Route path="/setup-price" element={<SetupPriceList />} />
-                <Route path="/setup-classes" element={<SetupClasses />} />
+                    <Route path="/profile" element={<ManageSchool />} />
 
-                <Route path="/" element={<Home />} />
-                <Route path="/login" element={<Login />} />
+                    <Route path="/setup-info" element={<SetupSchoolInfo />} />
+                    <Route path="/setup-rooms" element={<SetupRooms />} />
+                    <Route path="/setup-price" element={<SetupPriceList />} />
+                    <Route path="/setup-classes" element={<SetupClasses />} />
 
-                <Route path="/instructors" element={<EditInstructors />} />
-                <Route path="/news" element={<EditNews />} />
-                <Route path="/instructor/:id" element={<Instructor />} />
-                <Route path="/school/:id" element={<School />} />
-                <Route path="/my-reviews" element={<MyReviews />} />
-                <Route path="/search" element={<SearchResults />} />
-                
-            </Routes>
-        </>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/login" element={<Login />} />
+
+                    <Route path="/instructors" element={<EditInstructors />} />
+                    <Route path="/news" element={<EditNews />} />
+                    <Route path="/instructor/:id" element={<Instructor />} />
+                    <Route path="/school/:id" element={<School />} />
+                    <Route path="/my-reviews" element={<MyReviews />} />
+                    <Route path="/search" element={<SearchResults />} />
+                    <Route path="/terms" element={<Terms />} />
+                    <Route path="/privacy" element={<Privacy />} />
+                </Routes>
+            </div>
+
+            {/* 4. STOPKA NA SAMYM DOLE */}
+            <Footer />
+            
+        </div>
     );
 }
 

@@ -25,7 +25,6 @@ const SetupRooms = () => {
                     }
                 }
             })
-            .catch(() => console.log("Brak sal do wczytania"))
             .finally(() => setLoading(false));
     }, []);
 

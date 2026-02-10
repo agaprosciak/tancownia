@@ -11,8 +11,8 @@ const SetupSchoolInfo = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(true);
     const [isUpdating, setIsUpdating] = useState(false);
+    const [isGeocoding, setIsGeocoding] = useState(false); // Nowy stan dla ładowania mapy
 
-    // Sprawdzamy czy weszliśmy z profilu
     const isEditMode = location.state?.fromProfile;
 
     const [formData, setFormData] = useState({
@@ -32,26 +32,20 @@ const SetupSchoolInfo = () => {
             .then(res => {
                 if (res.data) {
                     setIsUpdating(true);
-                    
                     const fields = {};
                     Object.keys(formData).forEach(key => {
                         fields[key] = res.data[key] || '';
                     });
                     setFormData(fields);
-                    
                     if (res.data.logo) setLogoPreview(res.data.logo);
-                    
                     if (res.data.images) {
                         const existingImages = res.data.images.map(img => ({
-                            id: img.id,
-                            preview: img.image,
-                            isExisting: true 
+                            id: img.id, preview: img.image, isExisting: true 
                         }));
                         setGallery(existingImages);
                     }
                 }
             })
-            .catch(() => console.log("Brak szkoły, tworzymy nową."))
             .finally(() => setLoading(false));
     }, []);
 
@@ -76,9 +70,7 @@ const SetupSchoolInfo = () => {
             return;
         }
         const newImages = files.map(file => ({
-            file,
-            preview: URL.createObjectURL(file),
-            isExisting: false 
+            file, preview: URL.createObjectURL(file), isExisting: false 
         }));
         setGallery([...gallery, ...newImages]);
         if (fileInputRef.current) fileInputRef.current.value = ""; 
@@ -86,9 +78,7 @@ const SetupSchoolInfo = () => {
 
     const removeImage = (index) => {
         const imageToRemove = gallery[index];
-        if (imageToRemove.isExisting) {
-            setDeletedImages([...deletedImages, imageToRemove.id]);
-        }
+        if (imageToRemove.isExisting) setDeletedImages([...deletedImages, imageToRemove.id]);
         setGallery(gallery.filter((_, i) => i !== index));
     };
 
@@ -96,46 +86,101 @@ const SetupSchoolInfo = () => {
         e.preventDefault();
         setError('');
 
+        // --- 1. WALIDACJA SOCIAL MEDIA ---
         if (formData.instagram && (!formData.instagram.toLowerCase().includes('instagram.com') || !formData.instagram.toLowerCase().includes('http'))) {
-            setError("Link do Instagrama musi być pełnym adresem (zawierać http oraz instagram.com)");
+            setError("Link do Instagrama musi być pełnym adresem (http... instagram.com)");
             return;
         }
         if (formData.facebook && (!formData.facebook.toLowerCase().includes('facebook.com') || !formData.facebook.toLowerCase().includes('http'))) {
-            setError("Link do Facebooka musi być pełnym adresem (zawierać http oraz facebook.com)");
+            setError("Link do Facebooka musi być pełnym adresem (http... facebook.com)");
             return;
         }
-        const phoneRegex = /^[0-9\s+]*$/;
-        if (formData.phone && !phoneRegex.test(formData.phone)) {
-            setError("Numer telefonu może zawierać tylko cyfry, spacje i znak +");
+
+        // --- 2. WALIDACJA TELEFONU ---
+        const cleanPhone = formData.phone.replace(/[\s-]/g, '');
+        const phoneRegex = /^(\+48)?\d{9,15}$/; 
+        if (formData.phone && !phoneRegex.test(cleanPhone)) {
+            setError("Podaj poprawny numer telefonu (minimum 9 cyfr).");
             return;
         }
+
+        // --- 3. KOD POCZTOWY ---
+        const zipRegex = /^[0-9]{2}-[0-9]{3}$/;
+        if (!zipRegex.test(formData.postal_code)) {
+            setError("Kod pocztowy musi być w formacie XX-XXX (np. 35-310).");
+            return;
+        }
+
+        // --- 4. DŁUGOŚĆ ADRESU ---
+        if (formData.city.trim().length < 3) {
+            setError("Nazwa miejscowości jest za krótka.");
+            return;
+        }
+        if (formData.street.trim().length < 3) {
+            setError("Nazwa ulicy jest za krótka.");
+            return;
+        }
+
+        // --- 5. ZNAKI SPECJALNE ---
+        const safeTextRegex = /^[a-zA-Z0-9\s\/\-\.,ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+$/;
+        if (!safeTextRegex.test(formData.city) || !safeTextRegex.test(formData.street) || !safeTextRegex.test(formData.build_no)) {
+            setError("Adres zawiera niedozwolone znaki.");
+            return;
+        }
+
+        setIsGeocoding(true); // Włączamy loader mapy
+        let geoData = { lat: '', lon: '', state: '', county: '' };
         
-        let geoData = { lat: formData.latitude, lon: formData.longitude, state: formData.state, county: formData.county };
-        const { street, build_no, city, postal_code } = formData;
-        const cleanBuildNo = build_no.split('/')[0].trim();
-        const query = `${street} ${cleanBuildNo}, ${postal_code} ${city}, Poland`;
         try {
+            // --- 6. OBOWIĄZKOWE GEOKODOWANIE ---
+            const params = new URLSearchParams({
+                format: 'json',
+                addressdetails: 1,
+                limit: 1,
+                street: `${formData.build_no} ${formData.street}`, 
+                city: formData.city,
+                postalcode: formData.postal_code,
+                countrycodes: 'pl'
+            });
+
             const geoResponse = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=1`,
+                `https://nominatim.openstreetmap.org/search?${params.toString()}`,
                 { headers: { 'User-Agent': 'Tancownia-App-v1' } }
             );
+            
             const geoResult = await geoResponse.json();
-            if (geoResult && geoResult.length > 0) {
-                const res = geoResult[0];
-                geoData = {
-                    lat: parseFloat(res.lat).toFixed(6),
-                    lon: parseFloat(res.lon).toFixed(6),
-                    state: res.address.state || res.address.province || '',
-                    county: res.address.county || res.address.city || ''
-                };
+            
+            // JEŚLI NIE ZNALEZIONO ADRESU -> BLOKUJEMY FORMULARZ
+            if (!geoResult || geoResult.length === 0) {
+                setIsGeocoding(false);
+                setError("Nie znaleziono takiego adresu w Polsce. Sprawdź ulicę, numer i kod pocztowy.");
+                return; // STOP! Nie wysyłamy do backendu
             }
-        } catch (err) { console.error(err); }
 
+            const res = geoResult[0];
+            geoData = {
+                lat: parseFloat(res.lat).toFixed(6),
+                lon: parseFloat(res.lon).toFixed(6),
+                state: res.address.state || res.address.province || '',
+                county: res.address.county || res.address.city || ''
+            };
+
+        } catch (err) { 
+            console.error("Błąd geokodowania:", err);
+            setIsGeocoding(false);
+            setError("Wystąpił błąd weryfikacji adresu. Spróbuj ponownie później.");
+            return; // STOP! Błąd połączenia z mapą
+        }
+
+        setIsGeocoding(false); // Wyłączamy loader mapy, przechodzimy do zapisu
+
+        // --- PRZYGOTOWANIE DANYCH DO WYSYŁKI ---
         const data = new FormData();
         Object.keys(formData).forEach(key => data.append(key, formData[key].trim()));
 
-        if (geoData.lat) data.set('latitude', geoData.lat);
-        if (geoData.lon) data.set('longitude', geoData.lon);
+        // Nadpisujemy współrzędne - one MUSZĄ tam być
+        data.set('latitude', geoData.lat);
+        data.set('longitude', geoData.lon);
         data.set('state', geoData.state);
         data.set('county', geoData.county);
 
@@ -167,7 +212,7 @@ const SetupSchoolInfo = () => {
                 }
             }
         } catch (err) {
-            const serverMsg = err.response?.data ? Object.values(err.response.data).flat()[0] : "Błąd serwera.";
+            const serverMsg = err.response?.data ? Object.values(err.response.data).flat()[0] : "Błąd zapisu danych.";
             setError(serverMsg);
         }
     };
@@ -176,14 +221,9 @@ const SetupSchoolInfo = () => {
 
     return (
         <div style={styles.container}>
-            {/* --- ZMODYFIKOWANY NAGŁÓWEK --- */}
             <div style={styles.headerRow}>
                 {isEditMode && (
-                    <span 
-                        className="material-symbols-outlined" 
-                        style={styles.backArrow} 
-                        onClick={() => navigate('/profile')}
-                    >
+                    <span className="material-symbols-outlined" style={styles.backArrow} onClick={() => navigate('/profile')}>
                         arrow_back_ios
                     </span>
                 )}
@@ -195,7 +235,6 @@ const SetupSchoolInfo = () => {
 
             <div style={styles.card}>
                 <form onSubmit={handleSubmit}>
-                    {/* ... SEKCJE FORMULARZA (BEZ ZMIAN) ... */}
                     <div style={styles.section}>
                         <label style={styles.label}>Nazwa szkoły*</label>
                         <input style={styles.input} name="name" value={formData.name} required onChange={handleChange} />
@@ -215,7 +254,7 @@ const SetupSchoolInfo = () => {
 
                     <div style={styles.row}>
                         <div style={styles.col}><label style={styles.label}>E-mail*</label><input style={styles.input} name="email" value={formData.email} type="email" required onChange={handleChange} /></div>
-                        <div style={styles.col}><label style={styles.label}>Telefon</label><input style={styles.input} name="phone" value={formData.phone} onChange={handleChange} /></div>
+                        <div style={styles.col}><label style={styles.label}>Telefon</label><input style={styles.input} name="phone" value={formData.phone} onChange={handleChange} placeholder="np. 123 456 789" /></div>
                     </div>
 
                     <div style={styles.row}>
@@ -223,7 +262,7 @@ const SetupSchoolInfo = () => {
                         <div style={{flex: 1}}><label style={styles.label}>Nr*</label><input style={styles.input} name="build_no" value={formData.build_no} placeholder="np. 12 lub 12/4" required onChange={handleChange} /></div>
                     </div>
                     <div style={styles.row}>
-                        <div style={styles.col}><label style={styles.label}>Kod pocztowy*</label><input style={styles.input} name="postal_code" value={formData.postal_code} required onChange={handleChange} /></div>
+                        <div style={styles.col}><label style={styles.label}>Kod pocztowy*</label><input style={styles.input} name="postal_code" value={formData.postal_code} required onChange={handleChange} placeholder="XX-XXX" /></div>
                         <div style={styles.col}><label style={styles.label}>Miejscowość*</label><input style={styles.input} name="city" value={formData.city} required onChange={handleChange} /></div>
                     </div>
 
@@ -268,7 +307,9 @@ const SetupSchoolInfo = () => {
 
                     {error && <div style={styles.errorText}>{error}</div>}
 
-                    <button type="submit" style={styles.button}>{isUpdating ? 'Zapisz zmiany' : 'Zapisz i przejdź dalej'}</button>
+                    <button type="submit" style={styles.button} disabled={isGeocoding}>
+                        {isGeocoding ? 'Weryfikacja adresu...' : (isUpdating ? 'Zapisz zmiany' : 'Zapisz i przejdź dalej')}
+                    </button>
                 </form>
             </div>
         </div>
@@ -277,12 +318,9 @@ const SetupSchoolInfo = () => {
 
 const styles = {
     container: { backgroundColor: '#F8F9FF', minHeight: '100vh', padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
-    
-    // DODANE STYLE NAGŁÓWKA
     headerRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: '800px', marginBottom: '30px' },
     backArrow: { fontSize: '24px', cursor: 'pointer', color: '#333', fontWeight: 'bold' },
     mainTitle: { fontWeight: '300', fontSize: '28px', margin: 0, textAlign: 'center' },
-
     card: { backgroundColor: 'white', maxWidth: '800px', width: '100%', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' },
     section: { marginBottom: '25px' },
     label: { display: 'block', fontSize: '14px', marginBottom: '8px', color: '#434343', fontWeight: '500' },

@@ -154,23 +154,28 @@ class DanceClassSerializer(serializers.ModelSerializer):
         return dance_class
 
     def to_representation(self, instance):
-        """
-        FIX: To rozwiązuje błąd 'Style is not JSON serializable'.
-        Zamieniamy obiekt Style na jego ID przed wysłaniem odpowiedzi do Reacta.
-        """
         ret = super().to_representation(instance)
-        ret['style'] = instance.style.id if instance.style else None
+        # Zwracamy PEŁNY obiekt stylu, żeby frontend miał dostęp do style_name
+        if instance.style:
+            ret['style'] = StyleSerializer(instance.style).data
+        else:
+            ret['style'] = None
         return ret
     
+
 class SchoolSerializer(serializers.ModelSerializer):
     images = SchoolImageSerializer(many=True, read_only=True)
     floors = DanceFloorSerializer(many=True, read_only=True)
     instructors = InstructorSerializer(many=True, read_only=True)
     price_list = PriceListSerializer(many=True, read_only=True)
     styles = StyleSerializer(many=True, read_only=True)
+    classes = DanceClassSerializer(many=True, read_only=True)
 
     average_rating = serializers.DecimalField(max_digits=3, decimal_places=2, read_only=True)
     full_address = serializers.CharField(read_only=True)
+    
+    # !!! NOWOŚĆ: Pole liczby ocen !!!
+    reviews_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = School
@@ -181,10 +186,12 @@ class SchoolSerializer(serializers.ModelSerializer):
             'news', 'accepts_multisport', 'accepts_medicover', 'accepts_fitprofit', 
             'accepts_pzu_sport', 'benefit_cards_info', 'images', 'floors', 
             'instructors', 'price_list', 'styles', 'average_rating', 'full_address',
-            'latitude', 'longitude', 'state', 'county' 
+            'latitude', 'longitude', 'state', 'county',
+            'classes',
+            'reviews_count'
         ]
         
-        read_only_fields = ['id', 'user', 'average_rating', 'full_address']
+        read_only_fields = ['id', 'user', 'average_rating', 'full_address', 'reviews_count']
         
 
 

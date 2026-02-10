@@ -10,7 +10,6 @@ const SchoolList = () => {
         api.get('schools/')
             .then(response => {
                 setSchools(response.data);
-                console.log("Sukces! Dane:", response.data);
             })
             .catch(err => {
                 setError("Nie udało się pobrać szkół. Sprawdź CORS lub czy serwer działa.");

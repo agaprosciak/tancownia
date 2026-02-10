@@ -26,6 +26,25 @@ const normalizeRegion = (text) => {
         .trim();
 };
 
+// --- HELPER: POBIERANIE DANYCH MIASTA (Do Entera) ---
+const getCityData = async (query) => {
+    if (!query || query.length < 2) return [];
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&addressdetails=1&countrycodes=pl&limit=1&dedupe=0`);
+        const data = await res.json();
+        return data.map(item => ({
+            display_name: item.display_name.split(',')[0],
+            sub_text: item.address?.state,
+            full_item: item,
+            lat: item.lat,
+            lon: item.lon,
+            boundingbox: item.boundingbox
+        }));
+    } catch (err) {
+        return [];
+    }
+};
+
 // --- HELPER: OBLICZANIE ODLEGŁOŚCI ---
 const deg2rad = (deg) => deg * (Math.PI / 180);
 
@@ -190,7 +209,7 @@ const Home = () => {
     }, [filteredSchools]);
 
 
-    // --- NOMINATIM ---
+    // --- NOMINATIM (Z DEDUPLIKACJĄ) ---
     const fetchCities = async (query, target) => {
         if (!query || query.length < 2) return;
         
@@ -199,8 +218,8 @@ const Home = () => {
             const data = await res.json();
 
             const suggestions = data.map(item => {
-                const forbiddenClasses = ['tourism', 'amenity', 'leisure', 'shop', 'historic', 'highway', 'natural', 'building', 'landuse', 'man_made', 'office'];
-                if (forbiddenClasses.includes(item.class)) return null;
+                const allowedTypes = ['city', 'town', 'village', 'hamlet', 'suburb', 'administrative'];
+                if (!allowedTypes.includes(item.type)) return null;
                 if (item.class !== 'place' && item.class !== 'boundary') return null;
 
                 const addr = item.address;
@@ -212,10 +231,9 @@ const Home = () => {
                 const state = addr.state || '';
 
                 const extraInfo = [];
-                if (item.name === state) {
-                } else if (item.name === county) {
-                    extraInfo.push(state);
-                } else {
+                if (item.name === state) { } 
+                else if (item.name === county) { extraInfo.push(state); } 
+                else {
                     if (municipality && municipality !== mainName && !municipality.includes(mainName)) {
                         extraInfo.push(`gm. ${municipality.replace('Gmina ', '')}`);
                     }
@@ -292,6 +310,7 @@ const Home = () => {
     const goToSearch = (query, locationObj, cityString) => {
         let url = `/search?q=${encodeURIComponent(query)}&city=${encodeURIComponent(cityString)}`;
         
+        // Dodajemy parametry geo TYLKO jeśli mamy obiekt locationObj i nie jest to Cała Polska
         if (locationObj && cityString !== 'Cała Polska') {
             url += `&lat=${locationObj.lat}&lon=${locationObj.lon}`;
             if (locationObj.boundingbox) {
@@ -299,6 +318,9 @@ const Home = () => {
             }
             if (locationObj.full_item?.address?.state === locationObj.display_name || locationObj.full_item?.address?.county === locationObj.display_name) {
                 url += `&type=region`;
+            }
+            if (isExtendedRadius) {
+                url += `&radius=50`;
             }
         }
         navigate(url);
@@ -327,13 +349,28 @@ const Home = () => {
             navigate(`/instructor/${item.id}`);
         } 
         else if (type === 'style') {
+            // Wpisujemy styl i chowamy dropdown
             setSearchQuery(item.style_name);
             setShowSearchDropdown(false);
         }
     };
 
-    const handleEnterSearch = () => {
-        goToSearch(searchQuery, heroSelectedLocation, heroCityInput);
+    // --- !!! KLUCZOWA POPRAWKA ENTERA !!! ---
+    const handleEnterSearch = async () => {
+        let loc = heroSelectedLocation;
+        let cityStr = heroCityInput;
+
+        // Jeśli user wpisał tekst (np. "Wroc"), ale nie wybrał z listy -> pobieramy pierwszy wynik
+        if (!loc && cityStr !== 'Cała Polska' && cityStr.length > 1) {
+            const suggestions = await getCityData(cityStr);
+            if (suggestions.length > 0) {
+                loc = suggestions[0]; // Bierzemy pierwszy lepszy wynik (Wrocław, dolnośląskie)
+                cityStr = loc.display_name;
+            }
+        }
+
+        // Teraz 'loc' na pewno ma dane (lat, lon, bbox), jeśli miasto istnieje
+        goToSearch(searchQuery, loc, cityStr);
     };
 
     const nextSlide = () => { if (currentSlide < filteredSchools.length - 3) setCurrentSlide(currentSlide + 1); };
@@ -353,6 +390,7 @@ const Home = () => {
                             style={styles.searchInput}
                             value={searchQuery}
                             onChange={handleMainSearch}
+                            onKeyDown={(e) => e.key === 'Enter' && handleEnterSearch()}
                             onFocus={() => searchQuery.length > 1 && setShowSearchDropdown(true)}
                         />
                         {showSearchDropdown && (
@@ -362,13 +400,11 @@ const Home = () => {
                                         <div style={styles.dropdownHeader}>Instruktorzy</div>
                                         {searchSuggestions.instructors.map(i => (
                                             <div key={i.id} style={styles.resultItem} onClick={() => handleResultClick('instructor', i)}>
-                                                {/* --- TUTAJ ZMIANA: WYŚWIETLANIE ZDJĘCIA LUB LITERY --- */}
                                                 {i.photo ? (
                                                     <img src={i.photo} style={styles.resultAvatarImg} alt={`${i.first_name}`} />
                                                 ) : (
                                                     <div style={styles.resultAvatar}>{i.first_name[0]}</div>
                                                 )}
-                                                
                                                 <div style={styles.resultText}>
                                                     <span style={{fontWeight:'600'}}>{i.first_name} {i.last_name}</span>
                                                     {i.pseudonym && <span style={{fontSize:'12px', color:'#777'}}> "{i.pseudonym}"</span>}
@@ -412,12 +448,12 @@ const Home = () => {
                             type="text"
                             value={heroCityInput}
                             onChange={handleHeroCityInput}
+                            onKeyDown={(e) => e.key === 'Enter' && handleEnterSearch()}
                             onFocus={() => { setShowHeroCityDropdown(true); if(heroCityInput === 'Cała Polska') setHeroCityInput(''); }}
                             onBlur={() => { setTimeout(() => { if(heroCityInput === '') setHeroCityInput('Cała Polska'); }, 200); }}
                             placeholder="Cała Polska"
                             style={styles.cityInput}
                         />
-                        {/* USUNIĘTO PTASZEK */}
 
                         {showHeroCityDropdown && heroCitySuggestions.length > 0 && (
                             <div style={styles.cityDropdown}>
@@ -463,7 +499,6 @@ const Home = () => {
                             placeholder="Wpisz miasto..."
                             onFocus={() => { setShowContentCityDropdown(true); if(contentCityInput === 'Cała Polska') setContentCityInput(''); }}
                         />
-                        {/* USUNIĘTO PTASZEK */}
                     </div>
 
                     {showContentCityDropdown && contentCitySuggestions.length > 0 && (
@@ -491,7 +526,6 @@ const Home = () => {
                     <div style={styles.stylesGrid}>
                         {topStyles.map((styleName, index) => (
                             <div key={index} style={styles.styleItem} onClick={() => {
-                                // Kliknięcie w kafel stylu -> idzie do Search, ale bierze miasto z pigułki na dole
                                 goToSearch(styleName, selectedContentLocation, confirmedContentCity);
                             }}>
                                 <span className="material-symbols-outlined" style={styles.trendIcon}>trending_up</span>

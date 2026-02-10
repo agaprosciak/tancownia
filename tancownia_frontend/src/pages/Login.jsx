@@ -15,7 +15,6 @@ const Login = () => {
         
         const result = await loginUser(formData.email, formData.password);
         
-        console.log("Wynik logowania:", result);
 
         if (result && result.error) {
             setError('Błędny e-mail lub hasło.');
@@ -29,19 +28,15 @@ const Login = () => {
                     const hasRooms = res.data.floors && res.data.floors.length > 0;
 
                     if (hasSchool && hasRooms) {
-                        console.log("Owner gotowy - leci na Główną");
                         navigate('/'); 
                     } else {
-                        console.log("Owner niegotowy - leci do Profilu dokończyć setup");
                         navigate('/profile');
                     }
                 } catch (err) {
                     // Jak błąd (np. 404 brak szkoły), to do profilu żeby założył
-                    console.log("Błąd sprawdzania szkoły - leci do Profilu");
                     navigate('/profile');
                 }
             } else {
-                console.log("Tancerz zalogowany - wysyłam na stronę główną");
                 navigate('/');
             }
         }
