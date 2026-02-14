@@ -1,23 +1,19 @@
-/* index.css */
-
-/* 1. Globalny reset */
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-/* 2. Główne ustawienia czcionki dla strony */
+/* Główne ustawienia czcionki dla strony */
 body {
-  font-family: 'Inter', -apple-system, sans-serif; /* Żadnego !important tutaj! */
+  font-family: 'Inter', -apple-system, sans-serif;
   background-color: #F8F9FF;
   color: #212529;
   min-height: 100vh;
 }
 
-/* 3. MAGICZNA REGUŁA DLA IKON - TO NAPRAWI TWOJE "XDDD" */
 .material-symbols-outlined {
-  font-family: 'Material Symbols Outlined' !important; /* Wymuszamy czcionkę ikon */
+  font-family: 'Material Symbols Outlined' !important;
   font-weight: normal;
   font-style: normal;
   font-size: 24px;
@@ -28,14 +24,14 @@ body {
   white-space: nowrap;
   word-wrap: normal;
   direction: ltr;
-  font-feature-settings: 'liga'; /* To włącza zamianę tekstu w obrazek */
+  font-feature-settings: 'liga'; 
   -webkit-font-smoothing: antialiased;
 }
 
-/* 4. Linki i reszta (nie psujemy już ikon) */
+
 a {
   color: #7A33E3;
-  text-decoration: none; /* Domyślnie bez podkreślenia w navbarze */
+  text-decoration: none;
 }
 
 h1, h2, h3, label {

@@ -230,7 +230,7 @@ class DanceClass(models.Model):
     instructors = models.ManyToManyField('Instructor', related_name='classes', blank=True)
     
     level = models.CharField(
-        max_length=20, # Zwiększyłem lekko zapasowo
+        max_length=20,
         choices=LEVEL_CHOICES, 
         default='OPEN',
         verbose_name="Poziom zaawansowania"
