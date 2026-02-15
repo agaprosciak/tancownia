@@ -2,6 +2,7 @@ import { createContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import axios from 'axios';
 
 const AuthContext = createContext();
 
@@ -59,7 +60,11 @@ export const AuthProvider = ({ children }) => {
 
     const loginUser = async (email, password) => {
         try {
-            const response = await api.post('token/', { email, password });
+            const response = await axios.post('http://127.0.0.1:8000/api/token/', { 
+                email, 
+                password 
+            });
+            
             const data = response.data;
 
             if (response.status === 200) {
@@ -74,7 +79,6 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-
     const logoutUser = () => {
         setAuthTokens(null);
         setUser(null);
@@ -82,7 +86,6 @@ export const AuthProvider = ({ children }) => {
         
         localStorage.setItem('authMessage', "Wylogowano pomyślnie!"); 
         
-        //PRZEŁADOWANIE NA STRONĘ GŁÓWNĄ
         window.location.href = '/';
     };
 

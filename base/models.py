@@ -327,12 +327,12 @@ class DanceClass(models.Model):
 
             # SCENARIUSZ A: ZAJĘCIA CYKLICZNE (Stały grafik)
             if self.periodic:
-                # Sprawdzamy kolizję tylko z innymi cyklicznymi w ten sam dzień tygodnia
+                # Sprawdzanie kolizji tylko z innymi cyklicznymi zajęciami w ten sam dzień tygodnia
                 conflicts = qs.filter(periodic=True, day_of_week=self.day_of_week)
 
             # SCENARIUSZ B: WARSZTAT JEDNODNIOWY
             else:
-                # Sprawdzamy kolizję z innymi warsztatami w tę samą datę
+                # Sprawdzanie kolizji tylko pomiędzy warszatami jednorazowymi
                 conflicts = qs.filter(periodic=False, first_class_date=self.first_class_date)
 
             # Sprawdzanie zakresów godzin
