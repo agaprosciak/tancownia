@@ -346,7 +346,7 @@ const School = () => {
             let allFloors = schoolData.floors || [];
             
             // Sprawdza, czy w grafiku faktycznie są zajęcia bez przypisanej sali
-            const hasClassesWithoutRoom = classesData.some(c => c.floor === null);
+            const hasClassesWithoutRoom = classesData.some(c => c.periodic && c.floor === null);
 
             if (allFloors.length > 0) {
                 // Jeśli szkoła ma sale, dodawanie "Bez sali" TYLKO JEŚLI są takie zajęcia

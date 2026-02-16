@@ -158,6 +158,24 @@ const SetupSchoolInfo = () => {
             }
 
             const res = geoResult[0];
+
+            // Walidacja kodu pocztowego
+            const apiPostcode = res.address?.postcode; 
+
+            if (apiPostcode) {
+                // Normalizujemy kody (usuwamy myślniki), żeby "35-001" było równe "35001"
+                const cleanApiCode = apiPostcode.replace('-', '');
+                const cleanUserCode = formData.postal_code.replace('-', '');
+
+                // Jeśli kody są różne, blokujemy zapis i wyświetlamy błąd
+                if (cleanApiCode !== cleanUserCode) {
+                    setIsGeocoding(false);
+                    setError(`Niezgodność danych! Dla adresu ${formData.street} ${formData.build_no} system map wskazuje kod pocztowy: ${apiPostcode}. Popraw go.`);
+                    return; 
+                }
+            }
+
+            // Jeśli kod jest OK, pobieramy współrzędne
             geoData = {
                 lat: parseFloat(res.lat).toFixed(6),
                 lon: parseFloat(res.lon).toFixed(6),
