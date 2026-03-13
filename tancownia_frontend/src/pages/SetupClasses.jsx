@@ -28,22 +28,21 @@ const SetupClasses = () => {
         try {
             // 1. Pobranie sal
             const schoolRes = await api.get('schools/my_school/');
-            let allFloors = schoolRes.data.floors;
+            const allFloors = schoolRes.data.floors;
+            setRooms(allFloors); // Tylko realne sale z bazy
 
             // 2. Pobranie zajęć
             const classesRes = await api.get('classes/?my_classes=true');
             const fetchedClasses = classesRes.data;
             setClasses(fetchedClasses);
 
-            // 3. Sprawdzanie, czy są zajęcia bez sali
-            if (fetchedClasses.some(c => c.floor === null)) {
-                allFloors = [...allFloors, { id: 'no_room', name: 'Bez sali' }];
-            }
-            
-            setRooms(allFloors);
-
-            if (allFloors.length > 0 && !activeRoomId) {
-                setActiveRoomId(allFloors[0].id);
+            // 3. Ustawienie aktywnej zakładki przy pierwszym wejściu
+            if (!activeRoomId) {
+                if (allFloors.length > 0) {
+                    setActiveRoomId(allFloors[0].id);
+                } else if (fetchedClasses.some(c => c.floor === null)) {
+                    setActiveRoomId('no_room');
+                }
             }
             
             const instRes = await api.get('instructors/');
@@ -132,6 +131,19 @@ const SetupClasses = () => {
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     const dayLabels = ['PONIEDZIAŁEK', 'WTOREK', 'ŚRODA', 'CZWARTEK', 'PIĄTEK', 'SOBOTA', 'NIEDZIELA'];
 
+
+    const hasClassesWithoutRoom = classes.some(c => c.floor === null && c.periodic);
+    
+    const displayedRooms = hasClassesWithoutRoom 
+        ? [...rooms, { id: 'no_room', name: 'Bez sali' }] 
+        : rooms;
+
+    useEffect(() => {
+        if (activeRoomId === 'no_room' && !hasClassesWithoutRoom && rooms.length > 0) {
+            setActiveRoomId(rooms[0].id);
+        }
+    }, [hasClassesWithoutRoom, rooms, activeRoomId]);
+
     return (
         <div style={styles.container}>
             {/* --- NAGŁÓWEK --- */}
@@ -167,7 +179,7 @@ const SetupClasses = () => {
 
                 <h3 style={styles.subHeader}>Podgląd grafiku:</h3>
                 <div style={styles.tabs}>
-                    {rooms.map(r => (
+                    {displayedRooms.map(r => (
                         <button 
                             key={r.id} 
                             style={{
