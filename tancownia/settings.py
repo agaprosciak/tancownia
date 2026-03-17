@@ -146,6 +146,11 @@ STATIC_ROOT = BASE_DIR / "staticfiles"    # folder prod po collectstatic
 MEDIA_ROOT = BASE_DIR / "media"
 
 STORAGES = {
+    # To jest brakujące ogniwo – obsługa zdjęć szkół (Media)
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    # To jest to, co już masz – obsługa wyglądu admina (Static)
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
