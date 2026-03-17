@@ -23,7 +23,8 @@ ALLOWED_HOSTS = [
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://tancownia-backend.onrender.com'
+    'https://tancownia-backend.onrender.com',
+    'https://tancownia.vercel.app/',
 ]
 
 # Application definition
@@ -158,7 +159,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    # "https://twoja-nazwa-frontu.vercel.app",  <-- Tu wkleimy link z Vercela jak już go wyklikamy!
+    "https://tancownia.vercel.app",
 ]
 
 REST_FRAMEWORK = {
