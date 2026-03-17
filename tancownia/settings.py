@@ -22,6 +22,9 @@ ALLOWED_HOSTS = [
     'tancownia-backend.onrender.com'
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://tancownia-backend.onrender.com'
+]
 
 # Application definition
 
@@ -46,6 +49,7 @@ AUTH_USER_MODEL = 'base.User'
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -141,6 +145,12 @@ MEDIA_URL = '/media/'
 STATIC_ROOT = BASE_DIR / "staticfiles"    # folder prod po collectstatic
 MEDIA_ROOT = BASE_DIR / "media"
 
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -179,6 +189,3 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 # SESSION_COOKIE_SECURE = True
 # CSRF_COOKIE_SECURE = True
 
-CSRF_TRUSTED_ORIGINS = [
-    'https://tancownia-backend.onrender.com'
-]
