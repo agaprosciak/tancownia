@@ -16,7 +16,11 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'localhost:5173']
+ALLOWED_HOSTS = [
+    'localhost', 
+    '127.0.0.1', 
+    'tancownia-backend.onrender.com'
+]
 
 
 # Application definition
@@ -145,6 +149,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    # "https://twoja-nazwa-frontu.vercel.app",  <-- Tu wkleimy link z Vercela jak już go wyklikamy!
 ]
 
 REST_FRAMEWORK = {
@@ -173,3 +178,7 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 # SECURE_SSL_REDIRECT = True
 # SESSION_COOKIE_SECURE = True
 # CSRF_COOKIE_SECURE = True
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://tancownia-backend.onrender.com'
+]
