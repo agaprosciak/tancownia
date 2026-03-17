@@ -24,7 +24,7 @@ ALLOWED_HOSTS = [
 
 CSRF_TRUSTED_ORIGINS = [
     'https://tancownia-backend.onrender.com',
-    'https://tancownia.vercel.app/',
+    'https://tancownia.vercel.app',
 ]
 
 # Application definition
@@ -145,17 +145,6 @@ MEDIA_URL = '/media/'
 STATIC_ROOT = BASE_DIR / "staticfiles"    # folder prod po collectstatic
 MEDIA_ROOT = BASE_DIR / "media"
 
-STORAGES = {
-    # To jest brakujące ogniwo – obsługa zdjęć szkół (Media)
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    # To jest to, co już masz – obsługa wyglądu admina (Static)
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-}
-
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -194,3 +183,11 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 # SESSION_COOKIE_SECURE = True
 # CSRF_COOKIE_SECURE = True
 
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
