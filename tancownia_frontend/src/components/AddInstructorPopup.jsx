@@ -1,10 +1,14 @@
 import { useState, useRef } from 'react';
 import api from '../api';
 
-//Odbieranie initialData (null przy dodawaniu, obiekt przy edycji)
+const ImageWithFallback = ({ src, fallback, ...props }) => {
+    const [hasError, setHasError] = useState(false);
+    if (!src || hasError) return fallback;
+    return <img src={src} onError={() => setHasError(true)} {...props} />;
+};
+
 const AddInstructorPopup = ({ onClose, onSave, initialData = null }) => {
     
-    //Wypełnianie stanu danymi początkowymi (jeśli są)
     const [formData, setFormData] = useState({
         first_name: initialData?.first_name || '',
         pseudonym: initialData?.pseudonym || '',
@@ -15,10 +19,7 @@ const AddInstructorPopup = ({ onClose, onSave, initialData = null }) => {
     });
     
     const [errors, setErrors] = useState({});
-    
-    // Ustawianie podglądu zdjęcia z backendu (jeśli istnieje)
     const [preview, setPreview] = useState(initialData?.photo || null);
-    
     const fileInputRef = useRef(null);
 
     const handlePhotoChange = (e) => {
@@ -38,9 +39,23 @@ const AddInstructorPopup = ({ onClose, onSave, initialData = null }) => {
 
     const validate = () => {
         const newErrors = {};
+        
+        // WYMAGANE
         if (!formData.first_name.trim()) newErrors.first_name = "Imię jest wymagane.";
         if (!formData.last_name.trim()) newErrors.last_name = "Nazwisko jest wymagane.";
 
+        // WALIDACJA DŁUGOŚCI (BEZ OBCINANIA)
+        if (formData.first_name.length > 100) {
+            newErrors.first_name = `Imię jest za długie o ${formData.first_name.length - 100} znaków.`;
+        }
+        if (formData.last_name.length > 100) {
+            newErrors.last_name = `Nazwisko jest za długie o ${formData.last_name.length - 100} znaków.`;
+        }
+        if (formData.pseudonym.length > 100) {
+            newErrors.pseudonym = `Pseudonim jest za długi o ${formData.pseudonym.length - 100} znaków.`;
+        }
+
+        // SOCIAL MEDIA
         if (formData.instagram && !formData.instagram.includes('instagram.com')) {
             newErrors.instagram = "Link musi prowadzić do profilu na instagram.com";
         }
@@ -55,29 +70,42 @@ const AddInstructorPopup = ({ onClose, onSave, initialData = null }) => {
     const handleSave = async () => {
         if (!validate()) return;
 
-        const data = new FormData();
-        Object.keys(formData).forEach(key => {
-            // Dodawanie pola tylko jeśli ma wartość
-            if (formData[key]) {
-                data.append(key, formData[key]);
-            }
-        });
-
         try {
             let res;
-            // Rozróżnianie Edycji (PATCH) od Dodawania (POST)
-            if (initialData && initialData.id) {
-                // EDYCJA
-                res = await api.patch(`instructors/${initialData.id}/`, data, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
-            } else {
-                // Dodawanie nowego instruktora
-                res = await api.post('instructors/', data, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
-            }
+            const hasNewPhoto = formData.photo instanceof File;
+            const photoRemoved = preview === null && initialData?.photo;
 
+            if (hasNewPhoto || photoRemoved) {
+                const data = new FormData();
+                Object.keys(formData).forEach(key => {
+                    if (key === 'photo') {
+                        if (hasNewPhoto) data.append('photo', formData.photo);
+                        else if (photoRemoved) data.append('photo', '');
+                    } else {
+                        data.append(key, formData[key] || '');
+                    }
+                });
+                const config = { headers: { 'Content-Type': 'multipart/form-data' } };
+                if (initialData?.id) {
+                    res = await api.patch(`instructors/${initialData.id}/`, data, config);
+                } else {
+                    res = await api.post('instructors/', data, config);
+                }
+            } else {
+                // SZYBKI JSON DLA SAMEGO TEKSTU (ROZWIĄZUJE PROBLEM EDYCJI)
+                const payload = {
+                    first_name: formData.first_name,
+                    last_name: formData.last_name,
+                    pseudonym: formData.pseudonym,
+                    instagram: formData.instagram,
+                    facebook: formData.facebook
+                };
+                if (initialData?.id) {
+                    res = await api.patch(`instructors/${initialData.id}/`, payload);
+                } else {
+                    res = await api.post('instructors/', payload);
+                }
+            }
             onSave(res.data);
             onClose();
         } catch (err) {
@@ -90,18 +118,24 @@ const AddInstructorPopup = ({ onClose, onSave, initialData = null }) => {
         <div style={s.overlay}>
             <div style={s.window}>
                 <span style={s.close} onClick={onClose}>✕</span>
-                {/* Zmiana tytułu w zależności od trybu */}
-                <h2 style={s.title}>
-                    {initialData ? 'Edytuj instruktora' : 'Dodaj nowego instruktora'}
-                </h2>
+                <h2 style={s.title}>{initialData ? 'Edytuj instruktora' : 'Dodaj nowego instruktora'}</h2>
                 
                 <div style={s.scrollArea}>
                     <div style={s.photoContainer} onClick={() => fileInputRef.current.click()}>
                         <input type="file" ref={fileInputRef} hidden onChange={handlePhotoChange} accept="image/*" />
-                        
                         {preview ? (
                             <div style={s.imageWrapper}>
-                                <img src={preview} style={s.photoCircle} alt="Preview" />
+                                <ImageWithFallback 
+                                    src={preview} 
+                                    style={s.photoCircle} 
+                                    alt="Preview" 
+                                    fallback={
+                                        <div style={{...s.placeholder, border: 'none'}}>
+                                            <span className="material-symbols-outlined" style={s.placeholderIcon}>person</span>
+                                            <span style={s.placeholderText}>Brak zdjęcia</span>
+                                        </div>
+                                    } 
+                                />
                                 <div style={s.deleteBtn} onClick={removePhoto}>✕</div>
                             </div>
                         ) : (
@@ -113,22 +147,23 @@ const AddInstructorPopup = ({ onClose, onSave, initialData = null }) => {
                     </div>
 
                     <label style={s.label}>Imię*</label>
-                    <input style={s.input} placeholder="Imię" value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} />
+                    <input style={{...s.input, borderColor: errors.first_name ? 'red' : '#ddd'}} placeholder="Imię" value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} />
                     {errors.first_name && <span style={s.errorText}>{errors.first_name}</span>}
 
                     <label style={s.label}>Pseudonim</label>
-                    <input style={s.input} placeholder="Pseudonim" value={formData.pseudonym} onChange={e => setFormData({...formData, pseudonym: e.target.value})} />
+                    <input style={{...s.input, borderColor: errors.pseudonym ? 'red' : '#ddd'}} placeholder="Pseudonim" value={formData.pseudonym} onChange={e => setFormData({...formData, pseudonym: e.target.value})} />
+                    {errors.pseudonym && <span style={s.errorText}>{errors.pseudonym}</span>}
 
                     <label style={s.label}>Nazwisko*</label>
-                    <input style={s.input} placeholder="Nazwisko" value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} />
+                    <input style={{...s.input, borderColor: errors.last_name ? 'red' : '#ddd'}} placeholder="Nazwisko" value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} />
                     {errors.last_name && <span style={s.errorText}>{errors.last_name}</span>}
 
                     <label style={s.label}>Link do profilu na Instagramie</label>
-                    <input style={s.input} placeholder="instagram.com/użytkownik" value={formData.instagram} onChange={e => setFormData({...formData, instagram: e.target.value})} />
+                    <input style={{...s.input, borderColor: errors.instagram ? 'red' : '#ddd'}} placeholder="instagram.com/użytkownik" value={formData.instagram} onChange={e => setFormData({...formData, instagram: e.target.value})} />
                     {errors.instagram && <span style={s.errorText}>{errors.instagram}</span>}
 
                     <label style={s.label}>Link do profilu na Facebooku</label>
-                    <input style={s.input} placeholder="facebook.com/użytkownik" value={formData.facebook} onChange={e => setFormData({...formData, facebook: e.target.value})} />
+                    <input style={{...s.input, borderColor: errors.facebook ? 'red' : '#ddd'}} placeholder="facebook.com/użytkownik" value={formData.facebook} onChange={e => setFormData({...formData, facebook: e.target.value})} />
                     {errors.facebook && <span style={s.errorText}>{errors.facebook}</span>}
                 </div>
 

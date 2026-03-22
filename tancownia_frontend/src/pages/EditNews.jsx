@@ -6,6 +6,7 @@ const EditNews = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [newsText, setNewsText] = useState('');
+    const [localError, setLocalError] = useState(''); // Stan na błąd walidacji
 
     useEffect(() => {
         api.get('schools/my_school/')
@@ -19,12 +20,20 @@ const EditNews = () => {
     }, []);
 
     const handleSave = async () => {
+        setLocalError(''); // Reset błędu przed zapisem
+
+        // --- WALIDACJA: WYWAL BŁĄD ZAMIAST OBCINAĆ ---
+        if (newsText.length > 1000) {
+            setLocalError(`Treść aktualności jest za długa o ${newsText.length - 1000} znaków! Maksymalny limit to 1000.`);
+            return;
+        }
+
         try {
             await api.patch('schools/my_school/', { news: newsText });
             navigate('/profile');
         } catch (err) {
             console.error("Błąd zapisu:", err);
-            alert("Nie udało się zapisać aktualności.");
+            setLocalError("Nie udało się zapisać aktualności na serwerze.");
         }
     };
 
@@ -43,7 +52,7 @@ const EditNews = () => {
                     arrow_back_ios
                 </span>
                 <h1 style={styles.title}>Edytuj aktualności</h1>
-                <div style={{width: '24px'}}></div> {/* Pusty element dla RWD */}
+                <div style={{width: '24px'}}></div>
             </div>
 
             <div style={styles.card}>
@@ -53,13 +62,37 @@ const EditNews = () => {
                     Ten tekst wyświetli się na Twoim profilu.
                 </p>
 
-                <label style={styles.label}>Aktualności</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '10px' }}>
+                    <label style={styles.label}>Aktualności</label>
+                    {/* LICZNIK ZNAKÓW: Robi się czerwony po przekroczeniu 1000 */}
+                    <span style={{ 
+                        fontSize: '12px', 
+                        color: newsText.length > 1000 ? '#d32f2f' : '#888',
+                        fontWeight: newsText.length > 1000 ? 'bold' : 'normal'
+                    }}>
+                        {newsText.length}/1000
+                    </span>
+                </div>
+
                 <textarea 
-                    style={styles.textarea} 
+                    style={{
+                        ...styles.textarea, 
+                        borderColor: newsText.length > 1000 ? '#d32f2f' : '#ccc' // Zmiana koloru ramki przy błędzie
+                    }} 
                     value={newsText}
-                    onChange={(e) => setNewsText(e.target.value)}
+                    onChange={(e) => {
+                        setNewsText(e.target.value);
+                        if (localError) setLocalError(''); // Znikaj błąd jak user zacznie poprawiać
+                    }}
                     placeholder="Wpisz treść ogłoszenia..."
                 />
+
+                {/* KOMUNIKAT O BŁĘDZIE DŁUGOŚCI */}
+                {localError && (
+                    <div style={styles.errorBox}>
+                        {localError}
+                    </div>
+                )}
             </div>
 
             <button style={styles.saveBtn} onClick={handleSave}>
@@ -81,8 +114,20 @@ const styles = {
     
     purpleText: { color: '#7A33E3', textAlign: 'center', fontWeight: '600', marginBottom: '40px', lineHeight: '1.5' },
     
-    label: { display: 'block', fontSize: '16px', marginBottom: '10px', color: '#333', fontWeight: '500' },
-    textarea: { width: '100%', height: '250px', padding: '15px', border: '1px solid #ccc', fontSize: '16px', resize: 'vertical', fontFamily: 'inherit' },
+    label: { display: 'block', fontSize: '16px', margin: 0, color: '#333', fontWeight: '500' },
+    textarea: { width: '100%', height: '250px', padding: '15px', border: '1px solid #ccc', fontSize: '16px', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' },
+
+    errorBox: { 
+        marginTop: '15px', 
+        color: '#d32f2f', 
+        backgroundColor: '#ffebee', 
+        padding: '10px', 
+        borderRadius: '4px', 
+        fontSize: '14px', 
+        fontWeight: '500',
+        textAlign: 'center',
+        border: '1px solid #ffcdd2'
+    },
 
     saveBtn: { 
         marginTop: '30px',

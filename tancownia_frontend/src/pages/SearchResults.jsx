@@ -2,6 +2,13 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../api';
 
+// NOWY KOMPONENT: Automatycznie zamienia zepsuty obrazek na podanego fallbacka
+const ImageWithFallback = ({ src, fallback, ...props }) => {
+    const [hasError, setHasError] = useState(false);
+    if (!src || hasError) return fallback;
+    return <img src={src} onError={() => setHasError(true)} {...props} />;
+};
+
 const debounce = (func, delay) => {
     let timer;
     return function (...args) {
@@ -44,8 +51,40 @@ const SearchBar = ({ searchQuery, setSearchQuery, searchSuggestions, showSearchD
                 <input type="text" placeholder="Wyszukaj (styl, studio, instruktor)" style={styles.searchInput} value={searchQuery} onChange={handleMainSearch} onKeyDown={(e) => e.key === 'Enter' && onSubmit()} onFocus={() => searchQuery.length > 1 && setShowSearchDropdown(true)} />
                 {showSearchDropdown && (
                     <div style={styles.searchDropdown}>
-                        {searchSuggestions.instructors?.length > 0 && (<><div style={styles.dropdownHeader}>Instruktorzy</div>{searchSuggestions.instructors.map((i) => (<div key={i.id} style={styles.resultItem} onClick={() => handleResultClick('instructor', i)}>{i.photo ? <img src={i.photo} style={styles.resultAvatarImg} alt="" /> : <div style={styles.resultAvatar}>{i.first_name?.[0]}</div>}<div style={styles.resultText}><strong>{i.first_name} {i.last_name}</strong></div></div>))}</>)}
-                        {searchSuggestions.schools?.length > 0 && (<><div style={styles.dropdownHeader}>Szkoły</div>{searchSuggestions.schools.map((s) => (<div key={s.id} style={styles.resultItem} onClick={() => handleResultClick('school', s)}>{s.logo ? <img src={s.logo} style={styles.resultAvatarImg} alt="" /> : <div style={styles.resultAvatar}>{s.name?.[0]}</div>}<div style={styles.resultText}><strong>{s.name}</strong></div></div>))}</>)}
+                        {searchSuggestions.instructors?.length > 0 && (
+                            <>
+                                <div style={styles.dropdownHeader}>Instruktorzy</div>
+                                {searchSuggestions.instructors.map((i) => (
+                                    <div key={i.id} style={styles.resultItem} onClick={() => handleResultClick('instructor', i)}>
+                                        {/* ZMIANA: ImageWithFallback dla instruktorów w podpowiedziach */}
+                                        <ImageWithFallback 
+                                            src={i.photo} 
+                                            style={styles.resultAvatarImg} 
+                                            alt="" 
+                                            fallback={<div style={styles.resultAvatar}>{i.first_name?.[0]}</div>} 
+                                        />
+                                        <div style={styles.resultText}><strong>{i.first_name} {i.last_name}</strong></div>
+                                    </div>
+                                ))}
+                            </>
+                        )}
+                        {searchSuggestions.schools?.length > 0 && (
+                            <>
+                                <div style={styles.dropdownHeader}>Szkoły</div>
+                                {searchSuggestions.schools.map((s) => (
+                                    <div key={s.id} style={styles.resultItem} onClick={() => handleResultClick('school', s)}>
+                                        {/* ZMIANA: ImageWithFallback dla szkół w podpowiedziach */}
+                                        <ImageWithFallback 
+                                            src={s.logo} 
+                                            style={styles.resultAvatarImg} 
+                                            alt="" 
+                                            fallback={<div style={styles.resultAvatar}>{s.name?.[0]}</div>} 
+                                        />
+                                        <div style={styles.resultText}><strong>{s.name}</strong></div>
+                                    </div>
+                                ))}
+                            </>
+                        )}
                         {searchSuggestions.styles?.length > 0 && (<><div style={styles.dropdownHeader}>Style</div>{searchSuggestions.styles.map((s) => (<div key={s.id} style={styles.resultItem} onClick={() => handleResultClick('style', s)}><span className="material-symbols-outlined" style={{ marginRight: 10, color: '#7A33E3' }}>music_note</span><div style={styles.resultText}>{s.style_name}</div></div>))}</>)}
                         {searchSuggestions.instructors?.length === 0 && searchSuggestions.schools?.length === 0 && searchSuggestions.styles?.length === 0 && (<div style={{ padding: 15, color: '#999' }}>Brak wyników</div>)}
                     </div>
@@ -398,7 +437,15 @@ const SearchResults = () => {
 
         return (
             <div key={school.id} style={styles.schoolCard} onClick={() => navigate(`/school/${school.id}`)}>
-                <div style={styles.cardImageWrapper}>{school.logo ? <img src={school.logo} alt={school.name} style={styles.cardImage} /> : <div style={styles.cardPlaceholder}>{school.name[0]}</div>}</div>
+                <div style={styles.cardImageWrapper}>
+                    {/* ZMIANA: ImageWithFallback na liście wyników wyszukiwania */}
+                    <ImageWithFallback 
+                        src={school.logo} 
+                        alt={school.name} 
+                        style={styles.cardImage} 
+                        fallback={<div style={styles.cardPlaceholder}>{school.name[0]}</div>} 
+                    />
+                </div>
                 <div style={styles.cardInfo}>
                     <div style={{marginBottom: '5px'}}><h3 style={styles.schoolName}>{school.name}</h3><StarRating rating={school.average_rating} count={school.reviews_count} /></div>
                     <div style={styles.addressRow}><span className="material-symbols-outlined" style={{fontSize:'14px', color:'#555'}}>location_on</span>{school.full_address || `${school.city}, ${school.street} ${school.build_no}`}</div>

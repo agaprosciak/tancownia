@@ -10,6 +10,7 @@ const SetupPriceList = () => {
     const [showPopup, setShowPopup] = useState(false);
     const [prices, setPrices] = useState([]);
     const [editingIndex, setEditingIndex] = useState(null); 
+    const [localError, setLocalError] = useState(''); // Stan na błąd długości tekstu
     const [cards, setCards] = useState({
         multisport: false, medicover: false, pzu_sport: false, fitprofit: false, info: ''
     });
@@ -67,6 +68,14 @@ const SetupPriceList = () => {
     };
 
     const handleSave = async () => {
+        setLocalError('');
+
+        // --- WALIDACJA LIMITU ZNAKÓW ---
+        if (cards.info.length > 1000) {
+            setLocalError(`Opis kart sportowych jest za długi o ${cards.info.length - 1000} znaków! Limit to 1000.`);
+            return;
+        }
+
         try {
             await api.post('price-list/sync_prices/', { 
                 prices: prices, 
@@ -90,7 +99,6 @@ const SetupPriceList = () => {
     return (
         <div style={styles.container}>
             
-            {/* --- NAGŁÓWEK --- */}
             <div style={styles.header}>
                 {isEditMode && (
                     <span 
@@ -106,7 +114,6 @@ const SetupPriceList = () => {
                     {isEditMode ? 'Edytuj cennik' : 'Dodaj cennik'}
                 </h1>
 
-                {/* Pomiń TYLKO przy rejestracji (gdy NIE ma isEditMode) */}
                 {!isEditMode && (
                     <span style={styles.skip} onClick={() => navigate('/setup-classes')}>Pomiń &gt;</span>
                 )}
@@ -162,13 +169,37 @@ const SetupPriceList = () => {
                         </label>
                     ))}
                 </div>
-                <label style={styles.label}>Informacje o kartach (np. ewentualne dopłaty, kaucje)</label>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '10px' }}>
+                    <label style={styles.label}>Informacje o kartach (np. ewentualne dopłaty, kaucje)</label>
+                    {/* LICZNIK ZNAKÓW */}
+                    <span style={{ 
+                        fontSize: '11px', 
+                        color: cards.info.length > 1000 ? '#d32f2f' : '#888',
+                        fontWeight: cards.info.length > 1000 ? 'bold' : 'normal'
+                    }}>
+                        {cards.info.length}/1000
+                    </span>
+                </div>
+
                 <textarea 
-                    style={styles.textarea} 
+                    style={{
+                        ...styles.textarea,
+                        borderColor: cards.info.length > 1000 ? '#d32f2f' : '#E0E0E0'
+                    }} 
                     value={cards.info} 
                     placeholder="Wpisz dodatkowe informacje o akceptowanych kartach..."
-                    onChange={e => setCards({...cards, info: e.target.value})} 
+                    onChange={e => {
+                        setCards({...cards, info: e.target.value});
+                        if (localError) setLocalError('');
+                    }} 
                 />
+
+                {localError && (
+                    <div style={styles.errorBox}>
+                        {localError}
+                    </div>
+                )}
             </div>
 
             <button style={styles.saveBtn} onClick={handleSave}>
@@ -187,12 +218,10 @@ const SetupPriceList = () => {
 
 const styles = {
     container: { backgroundColor: '#F8F9FF', minHeight: '100vh', padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
-    
     header: { width: '100%', maxWidth: '750px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' },
     title: { fontSize: '32px', fontWeight: '400', color: '#333', margin: 0 },
     skip: { cursor: 'pointer', fontWeight: '600', color: '#666', fontSize: '15px' },
     backArrow: { fontSize: '24px', cursor: 'pointer', color: '#333', fontWeight: 'bold' },
-
     card: { backgroundColor: 'white', width: '100%', maxWidth: '750px', padding: '40px', borderRadius: '20px', marginBottom: '30px', boxShadow: '0 4px 25px rgba(0,0,0,0.06)' },
     addBtn: { width: '100%', backgroundColor: '#7A33E3', color: 'white', padding: '16px', borderRadius: '12px', border: 'none', fontWeight: '700', fontSize: '16px', cursor: 'pointer', transition: '0.2s' },
     sectionLabel: { color: '#7A33E3', marginBottom: '20px', fontSize: '18px', fontWeight: '700' },
@@ -201,9 +230,10 @@ const styles = {
     checkGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px' },
     checkLabel: { display: 'flex', alignItems: 'center', gap: '12px', fontWeight: '600', color: '#444', cursor: 'pointer' },
     checkbox: { width: '18px', height: '18px', cursor: 'pointer', accentColor: '#7A33E3' },
-    label: { display: 'block', marginBottom: '10px', fontWeight: '600', fontSize: '14px', color: '#555' },
-    textarea: { width: '100%', height: '120px', border: '1px solid #E0E0E0', borderRadius: '12px', padding: '15px', fontSize: '14px', outline: 'none', resize: 'none' },
-    saveBtn: { backgroundColor: '#7A33E3', color: 'white', padding: '16px 60px', borderRadius: '12px', border: 'none', fontWeight: '700', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', boxShadow: 'none' }
+    label: { display: 'block', margin: 0, fontWeight: '600', fontSize: '14px', color: '#555' },
+    textarea: { width: '100%', height: '120px', border: '1px solid #E0E0E0', borderRadius: '12px', padding: '15px', fontSize: '14px', outline: 'none', resize: 'none', boxSizing: 'border-box' },
+    errorBox: { marginTop: '10px', color: '#d32f2f', backgroundColor: '#ffebee', padding: '10px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', textAlign: 'center', border: '1px solid #ffcdd2' },
+    saveBtn: { backgroundColor: '#7A33E3', color: 'white', padding: '16px 60px', borderRadius: '12px', border: 'none', fontWeight: '700', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }
 };
 
 export default SetupPriceList;

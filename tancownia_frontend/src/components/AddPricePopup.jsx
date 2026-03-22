@@ -13,7 +13,6 @@ const AddPricePopup = ({ onClose, onSave, initialData }) => {
         description: ''
     });
 
-
     useEffect(() => {
         if (initialData) {
             setType(initialData.entry_type || initialData.type || 'pass');
@@ -31,7 +30,15 @@ const AddPricePopup = ({ onClose, onSave, initialData }) => {
     const validate = () => {
         let errors = {};
         
-        // Nazwa
+        // --- WALIDACJA LIMITÓW ZNAKÓW ---
+        if (formData.name.length > 100) {
+            errors.name = `Nazwa jest za długa o ${formData.name.length - 100} znaków!`;
+        }
+        if (formData.description.length > 1000) {
+            errors.description = `Opis jest za długi o ${formData.description.length - 1000} znaków!`;
+        }
+
+        // Nazwa pusta
         if (!formData.name.trim()) errors.name = "Podaj nazwę.";
         
         // Czas trwania
@@ -160,13 +167,23 @@ const AddPricePopup = ({ onClose, onSave, initialData }) => {
                 </div>
 
                 <div style={{marginTop: '15px'}}>
-                    <label style={styles.label}>Szczegóły</label>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                        <label style={styles.label}>Szczegóły</label>
+                        <span style={{
+                            fontSize: '11px', 
+                            color: formData.description.length > 1000 ? '#ff4d4f' : '#888',
+                            fontWeight: formData.description.length > 1000 ? 'bold' : 'normal'
+                        }}>
+                            {formData.description.length}/1000
+                        </span>
+                    </div>
                     <textarea 
                         placeholder="Dodatkowe informacje..."
-                        style={{...styles.input, height: '80px', resize: 'none'}} 
+                        style={{...styles.input, height: '80px', resize: 'none', borderColor: fieldErrors.description ? '#ff4d4f' : '#E0E0E0'}} 
                         value={formData.description}
                         onChange={e => setFormData({...formData, description: e.target.value})} 
                     />
+                    {fieldErrors.description && <span style={styles.errorText}>{fieldErrors.description}</span>}
                 </div>
 
                 <button style={styles.submitBtn} onClick={handleAdd}>
@@ -186,9 +203,9 @@ const styles = {
     toggleGroup: { backgroundColor: '#7A33E3', padding: '5px', borderRadius: '12px', display: 'flex', marginBottom: '25px' },
     toggle: { flex: 1, border: 'none', padding: '12px', borderRadius: '10px', fontWeight: '700', cursor: 'pointer', transition: '0.3s' },
     label: { display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '8px', color: '#444' },
-    input: { width: '100%', padding: '12px', border: '1px solid #E0E0E0', borderRadius: '10px', fontSize: '14px', outline: 'none' },
+    input: { width: '100%', padding: '12px', border: '1px solid #E0E0E0', borderRadius: '10px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' },
     checkLabel: { fontSize: '11px', display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap', cursor: 'pointer' },
-    errorText: { color: '#ff4d4f', fontSize: '11px', fontWeight: '500', marginTop: '4px', display: 'block' },
+    errorText: { color: '#ff4d4f', fontSize: '11px', fontWeight: 'bold', marginTop: '4px', display: 'block' },
     submitBtn: { width: '100%', marginTop: '30px', backgroundColor: '#7A33E3', color: 'white', padding: '16px', borderRadius: '12px', border: 'none', fontWeight: '700', fontSize: '16px', cursor: 'pointer', transition: '0.2s' }
 };
 

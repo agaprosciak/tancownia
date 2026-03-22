@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import AuthContext from '../context/AuthContext';
 
+// NOWY KOMPONENT: Automatycznie zamienia zepsuty obrazek na podanego fallbacka
+const ImageWithFallback = ({ src, fallback, ...props }) => {
+    const [hasError, setHasError] = useState(false);
+    if (!src || hasError) return fallback;
+    return <img src={src} onError={() => setHasError(true)} {...props} />;
+};
+
 const Profile = () => {
     const navigate = useNavigate();
     const { user, logoutUser } = useContext(AuthContext); 
@@ -111,11 +118,13 @@ const Profile = () => {
                 {isOwner && schoolData ? (
                     <div style={styles.contentWrapper}>
                         <div style={styles.logoWrapper}>
-                            {schoolData.logo ? (
-                                <img src={schoolData.logo} alt="Logo" style={styles.logo} />
-                            ) : (
-                                <div style={styles.logoPlaceholder}>{schoolData.name ? schoolData.name[0] : 'S'}</div>
-                            )}
+                            {/* ZMIANA: Użycie ImageWithFallback dla loga szkoły w profilu */}
+                            <ImageWithFallback 
+                                src={schoolData.logo} 
+                                alt="Logo" 
+                                style={styles.logo} 
+                                fallback={<div style={styles.logoPlaceholder}>{schoolData.name ? schoolData.name[0] : 'S'}</div>} 
+                            />
                         </div>
                         <h2 style={styles.nameTitle}>{schoolData.name}</h2>
 

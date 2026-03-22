@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
 
+// NOWY KOMPONENT: Automatycznie zamienia zepsuty obrazek na podanego fallbacka
+const ImageWithFallback = ({ src, fallback, ...props }) => {
+    const [hasError, setHasError] = useState(false);
+    if (!src || hasError) return fallback;
+    return <img src={src} onError={() => setHasError(true)} {...props} />;
+};
+
 const Instructor = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -42,11 +49,13 @@ const Instructor = () => {
             <div style={styles.card}>
                 
                 <div style={styles.imageSection}>
-                    {instructor.photo ? (
-                        <img src={instructor.photo} alt={fullName} style={styles.avatar} />
-                    ) : (
-                        <div style={styles.placeholderAvatar}>{instructor.first_name[0]}</div>
-                    )}
+                    {/* ZMIANA: Użycie ImageWithFallback dla zdjęcia instruktora */}
+                    <ImageWithFallback 
+                        src={instructor.photo} 
+                        alt={fullName} 
+                        style={styles.avatar} 
+                        fallback={<div style={styles.placeholderAvatar}>{instructor.first_name[0]}</div>} 
+                    />
                 </div>
 
                 <div style={styles.infoSection}>

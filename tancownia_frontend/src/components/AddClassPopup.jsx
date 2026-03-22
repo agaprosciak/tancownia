@@ -27,7 +27,6 @@ const AddClassPopup = ({ type, rooms, instructors, onClose, onSave, onOpenInstru
         api.get('styles/').then(res => setStylesList(res.data));
     }, []);
 
-    //WYPEŁNIANIE DANYCH PRZY EDYCJI
     useEffect(() => {
         if (editingClass) {
             const foundStyle = stylesList.find(s => s.id === editingClass.style);
@@ -42,12 +41,11 @@ const AddClassPopup = ({ type, rooms, instructors, onClose, onSave, onOpenInstru
                 min_age: editingClass.min_age,
                 max_age: editingClass.max_age || '',
                 unlimited_age: !editingClass.max_age,
-                // Przy ładowaniu do edycji, bierzemy daty z obiektu
                 first_class_date: editingClass.first_class_date,
                 last_class_date: editingClass.last_class_date || '',
                 starts_at: editingClass.starts_at ? editingClass.starts_at.slice(0,5) : '',
                 ends_at: editingClass.ends_at ? editingClass.ends_at.slice(0,5) : '',
-                floor: editingClass.floor || '', // Tutaj null zamieni się na pusty string dla selecta
+                floor: editingClass.floor || '',
                 price: editingClass.price || '',
                 priceFromList: !editingClass.price,
                 registration_info_link: editingClass.registration_info_link || '',
@@ -60,7 +58,7 @@ const AddClassPopup = ({ type, rooms, instructors, onClose, onSave, onOpenInstru
                     day_of_week: editingClass.day_of_week,
                     starts_at: editingClass.starts_at ? editingClass.starts_at.slice(0,5) : '',
                     ends_at: editingClass.ends_at ? editingClass.ends_at.slice(0,5) : '',
-                    floor: editingClass.floor || '', // Tutaj też null na ''
+                    floor: editingClass.floor || '',
                     first_class_date: editingClass.first_class_date
                 }]);
             }
@@ -113,6 +111,14 @@ const AddClassPopup = ({ type, rooms, instructors, onClose, onSave, onOpenInstru
 
     const handleSave = async () => {
         const errors = {};
+        
+        if (formData.registration_info_link.length > 1000) {
+            errors.registration_info_link = `Za długie o ${formData.registration_info_link.length - 1000} znaków!`;
+        }
+        if (formData.description.length > 1000) {
+            errors.description = `Za długie o ${formData.description.length - 1000} znaków!`;
+        }
+
         if (!formData.style.trim()) errors.style = "Musisz wpisać lub wybrać styl!";
         
         const minAgeInt = parseInt(formData.min_age);
@@ -161,7 +167,6 @@ const AddClassPopup = ({ type, rooms, instructors, onClose, onSave, onOpenInstru
                 periodic: isPeriodic,
                 price: formData.priceFromList ? null : (formData.price || null),
                 max_age: formData.unlimited_age ? null : (formData.max_age || null),
-                //Jeśli wybrano "Bez sali" (string ""), zamieniamy na null
                 floor: formData.floor ? formData.floor : null,
                 last_class_date: isPeriodic ? null : (isMultiDay ? formData.last_class_date : formData.first_class_date)
             };
@@ -176,10 +181,8 @@ const AddClassPopup = ({ type, rooms, instructors, onClose, onSave, onOpenInstru
             }
 
             if (isPeriodic) {
-                // Dla cyklicznych wysyłamy listę slotów
                 await api.post('classes/', { ...basePayload, time_slots: processedTimeSlots });
             } else {
-                // Dla warsztatów
                 await api.post('classes/', basePayload);
             }
 
@@ -282,11 +285,9 @@ const AddClassPopup = ({ type, rooms, instructors, onClose, onSave, onOpenInstru
                                 </div>
                                 {(fieldErrors[`slot_${index}_time`] || fieldErrors.starts_at) && <p style={s.errorText}>{fieldErrors[`slot_${index}_time`] || fieldErrors.starts_at}</p>}
                                 
-                                {/* SELECT SALI DLA ZAJĘĆ CYKLICZNYCH */}
                                 <div style={{marginTop:'10px'}}>
                                     <label style={s.label}>Sala</label>
                                     <select style={s.input} value={slot.floor} onChange={e => updateSlot(index, 'floor', e.target.value)}>
-                                        {/* Opcja BEZ SALI */}
                                         <option value="">-- Bez sali --</option>
                                         {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                     </select>
@@ -313,11 +314,9 @@ const AddClassPopup = ({ type, rooms, instructors, onClose, onSave, onOpenInstru
                             )}
                             {!isMultiDay && <div style={s.row}><div style={s.flex1}><label style={s.label}>Godzina zakończenia*</label><input type="time" value={formData.ends_at} style={{...s.input, borderColor: fieldErrors.ends_at ? 'red' : '#ddd'}} onChange={e => setFormData({...formData, ends_at: e.target.value})} />{fieldErrors.ends_at && <p style={s.errorText}>{fieldErrors.ends_at}</p>}</div></div>}
                             
-                            {/* SELECT SALI DLA EVENTU */}
                             <div style={{marginTop:'10px'}}>
                                 <label style={s.label}>Sala</label>
                                 <select style={s.input} value={formData.floor} onChange={e => setFormData({...formData, floor: e.target.value})}>
-                                    {/* Opcja BEZ SALI */}
                                     <option value="">-- Bez sali --</option>
                                     {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                 </select>
@@ -334,20 +333,36 @@ const AddClassPopup = ({ type, rooms, instructors, onClose, onSave, onOpenInstru
                         {fieldErrors.price && <p style={s.errorText}>{fieldErrors.price}</p>}
                     </div>
 
-                    <label style={s.label}>Zapisy / Link</label>
-                    <textarea style={s.textarea} value={formData.registration_info_link} placeholder="Informacje jak się zapisać lub link do zapisów..." onChange={e => setFormData({...formData, registration_info_link: e.target.value})} />
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '10px'}}>
+                        <label style={s.label}>Zapisy / Link</label>
+                        <span style={{...s.charCounter, color: formData.registration_info_link.length > 1000 ? 'red' : '#888'}}>
+                            {formData.registration_info_link.length}/1000
+                        </span>
+                    </div>
+                    <textarea 
+                        style={{...s.textarea, borderColor: fieldErrors.registration_info_link ? 'red' : '#ddd'}} 
+                        value={formData.registration_info_link} 
+                        placeholder="Informacje o zapisach..." 
+                        onChange={e => setFormData({...formData, registration_info_link: e.target.value})} 
+                    />
+                    {fieldErrors.registration_info_link && <p style={s.errorText}>{fieldErrors.registration_info_link}</p>}
 
-                    <label style={s.label}>Opis zajęć</label>
-                    <textarea style={s.textarea} value={formData.description} placeholder="Opisz zajęcia, podaj ważne informacje..." onChange={e => setFormData({...formData, description: e.target.value})} />
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '10px'}}>
+                        <label style={s.label}>Opis zajęć</label>
+                        <span style={{...s.charCounter, color: formData.description.length > 1000 ? 'red' : '#888'}}>
+                            {formData.description.length}/1000
+                        </span>
+                    </div>
+                    <textarea 
+                        style={{...s.textarea, borderColor: fieldErrors.description ? 'red' : '#ddd'}} 
+                        value={formData.description} 
+                        placeholder="Opisz zajęcia..." 
+                        onChange={e => setFormData({...formData, description: e.target.value})} 
+                    />
+                    {fieldErrors.description && <p style={s.errorText}>{fieldErrors.description}</p>}
 
                     <label style={s.checkLabel}><input type="checkbox" checked={formData.is_open} onChange={e => setFormData({...formData, is_open: e.target.checked})} /> Zapisy otwarte</label>
                 </div>
-                
-                {(fieldErrors.starts_at || fieldErrors.global) && (
-                    <div style={{...s.errorText, textAlign: 'center', backgroundColor: '#fff2f0', padding: '10px', borderRadius: '10px', border: '1px solid #ffccc7', marginBottom: '10px'}}>
-                        {fieldErrors.starts_at || fieldErrors.global}
-                    </div>
-                )}
                 
                 <button style={s.submitBtn} onClick={handleSave}>
                     {editingClass ? 'Zapisz zmiany' : 'Zapisz i dodaj'}
@@ -382,9 +397,10 @@ const s = {
     removeSlot: { position: 'absolute', top: '10px', right: '15px', color: '#ff4d4f', fontSize: '11px', cursor: 'pointer', fontWeight: '700' },
     addTermBtn: { width: '100%', backgroundColor: '#7A33E3', color: 'white', padding: '12px', borderRadius: '12px', border: 'none', fontWeight: '700', marginTop: '12px', cursor: 'pointer' },
     pricePlaceholder: { flex: '1 1 150px', padding: '10px', backgroundColor: '#eee', borderRadius: '10px', fontSize: '13px', color: '#666', textAlign: 'center' },
-    textarea: { width: '100%', height: '70px', borderRadius: '10px', padding: '10px', border: '1px solid #ddd', resize: 'none', marginTop: '5px' },
+    textarea: { width: '100%', height: '70px', borderRadius: '10px', padding: '10px', border: '1px solid #ddd', resize: 'none' },
     submitBtn: { backgroundColor: '#7A33E3', color: 'white', padding: '15px', borderRadius: '15px', border: 'none', fontWeight: '800', fontSize: '16px', marginTop: '20px', cursor: 'pointer' },
-    subTitle: { fontSize: '17px', fontWeight: '800', marginTop: '25px', color: '#7A33E3' }
+    subTitle: { fontSize: '17px', fontWeight: '800', marginTop: '25px', color: '#7A33E3' },
+    charCounter: { fontSize: '11px', fontWeight: '600' }
 };
 
 export default AddClassPopup;

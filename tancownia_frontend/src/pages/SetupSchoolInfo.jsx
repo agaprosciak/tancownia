@@ -2,6 +2,13 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
 
+// NOWY KOMPONENT: Automatycznie zamienia zepsuty obrazek na podanego fallbacka
+const ImageWithFallback = ({ src, fallback, ...props }) => {
+    const [hasError, setHasError] = useState(false);
+    if (!src || hasError) return fallback;
+    return <img src={src} onError={() => setHasError(true)} {...props} />;
+};
+
 const SetupSchoolInfo = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -86,6 +93,20 @@ const SetupSchoolInfo = () => {
         e.preventDefault();
         setError('');
 
+        // --- WALIDACJA LIMITÓW ZNAKÓW ---
+        if (formData.description.length > 2500) {
+            setError(`Opis szkoły jest za długi o ${formData.description.length - 2500} znaków!`);
+            return;
+        }
+        if (formData.rules.length > 1500) {
+            setError(`Regulamin jest za długi o ${formData.rules.length - 1500} znaków!`);
+            return;
+        }
+        if (formData.default_registration_info_link.length > 1000) {
+            setError(`Informacje o zapisach są za długie o ${formData.default_registration_info_link.length - 1000} znaków!`);
+            return;
+        }
+
         // --- WALIDACJA SOCIAL MEDIA ---
         if (formData.instagram && (!formData.instagram.toLowerCase().includes('instagram.com') || !formData.instagram.toLowerCase().includes('http'))) {
             setError("Link do Instagrama musi być pełnym adresem (http... instagram.com)");
@@ -132,7 +153,6 @@ const SetupSchoolInfo = () => {
         let geoData = { lat: '', lon: '', state: '', county: '' };
         
         try {
-            // --- OBOWIĄZKOWE GEOKODOWANIE ---
             const params = new URLSearchParams({
                 format: 'json',
                 addressdetails: 1,
@@ -150,7 +170,6 @@ const SetupSchoolInfo = () => {
             
             const geoResult = await geoResponse.json();
             
-            // JEŚLI NIE ZNALEZIONO ADRESU -> FORMULARZ BLOKOWANY
             if (!geoResult || geoResult.length === 0) {
                 setIsGeocoding(false);
                 setError("Nie znaleziono takiego adresu w Polsce. Sprawdź ulicę, numer i kod pocztowy.");
@@ -158,16 +177,11 @@ const SetupSchoolInfo = () => {
             }
 
             const res = geoResult[0];
-
-            // Walidacja kodu pocztowego
             const apiPostcode = res.address?.postcode; 
 
             if (apiPostcode) {
-                // Normalizujemy kody (usuwamy myślniki), żeby "35-001" było równe "35001"
                 const cleanApiCode = apiPostcode.replace('-', '');
                 const cleanUserCode = formData.postal_code.replace('-', '');
-
-                // Jeśli kody są różne, blokujemy zapis i wyświetlamy błąd
                 if (cleanApiCode !== cleanUserCode) {
                     setIsGeocoding(false);
                     setError(`Niezgodność danych! Dla adresu ${formData.street} ${formData.build_no} system map wskazuje kod pocztowy: ${apiPostcode}. Popraw go.`);
@@ -175,7 +189,6 @@ const SetupSchoolInfo = () => {
                 }
             }
 
-            // Jeśli kod jest OK, pobieramy współrzędne
             geoData = {
                 lat: parseFloat(res.lat).toFixed(6),
                 lon: parseFloat(res.lon).toFixed(6),
@@ -195,39 +208,27 @@ const SetupSchoolInfo = () => {
         // --- PRZYGOTOWANIE DANYCH DO WYSYŁKI ---
         const data = new FormData();
         Object.keys(formData).forEach(key => data.append(key, formData[key].trim()));
-
-        // Zapis wpółrzędnych
         data.set('latitude', geoData.lat);
         data.set('longitude', geoData.lon);
         data.set('state', geoData.state);
         data.set('county', geoData.county);
 
         if (logo) data.append('logo', logo);
-        
         gallery.forEach(img => {
-            if (!img.isExisting && img.file) {
-                data.append('uploaded_images', img.file);
-            }
+            if (!img.isExisting && img.file) data.append('uploaded_images', img.file);
         });
-
-        deletedImages.forEach(id => {
-            data.append('deleted_images', id);
-        });
+        deletedImages.forEach(id => data.append('deleted_images', id));
 
         try {
             const method = isUpdating ? 'put' : 'post';
             const url = isUpdating ? 'schools/my_school/' : 'schools/';
-            
             const response = await api[method](url, data, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             
             if (response.status === 201 || response.status === 200) {
-                if (isEditMode) {
-                    navigate('/profile');
-                } else {
-                    navigate('/setup-rooms');
-                }
+                if (isEditMode) navigate('/profile');
+                else navigate('/setup-rooms');
             }
         } catch (err) {
             const serverMsg = err.response?.data ? Object.values(err.response.data).flat()[0] : "Błąd zapisu danych.";
@@ -263,7 +264,12 @@ const SetupSchoolInfo = () => {
                             </button>
                             <input type="file" hidden ref={logoInputRef} onChange={handleLogoChange} />
                             {logoPreview ? (
-                                <img src={logoPreview} style={styles.logoPreview} alt="Logo" />
+                                <ImageWithFallback 
+                                    src={logoPreview} 
+                                    style={styles.logoPreview} 
+                                    alt="Logo" 
+                                    fallback={<div style={styles.logoCirclePlaceholder}><span className="material-symbols-outlined" style={{color: '#ccc'}}>image</span></div>} 
+                                />
                             ) : (
                                 <div style={styles.logoCirclePlaceholder}><span className="material-symbols-outlined" style={{color: '#ccc'}}>image</span></div>
                             )}
@@ -294,12 +300,32 @@ const SetupSchoolInfo = () => {
                     </div>
 
                     <div style={styles.section}>
-                        <label style={styles.label}>Opis szkoły*</label>
-                        <textarea style={styles.textarea} name="description" value={formData.description} required onChange={handleChange} />
-                        <label style={styles.label}>Regulamin</label>
-                        <textarea style={styles.textarea} name="rules" value={formData.rules} onChange={handleChange} placeholder="Link lub tekst" />
-                        <label style={styles.label}>Zapisy</label>
-                        <textarea style={styles.textarea} name="default_registration_info_link" value={formData.default_registration_info_link} onChange={handleChange} placeholder="Informacje o zapisach" />
+                        {/* OPIS SZKOŁY */}
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px'}}>
+                            <label style={{...styles.label, marginBottom: 0}}>Opis szkoły*</label>
+                            <span style={{ fontSize: '11px', color: formData.description.length > 2500 ? 'red' : '#888', fontWeight: formData.description.length > 2500 ? 'bold' : 'normal' }}>
+                                {formData.description.length}/2500
+                            </span>
+                        </div>
+                        <textarea style={{...styles.textarea, borderColor: formData.description.length > 2500 ? 'red' : '#E0E0E0'}} name="description" value={formData.description} required onChange={handleChange} />
+                        
+                        {/* REGULAMIN */}
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px', marginTop: '10px'}}>
+                            <label style={{...styles.label, marginBottom: 0}}>Regulamin</label>
+                            <span style={{ fontSize: '11px', color: formData.rules.length > 1500 ? 'red' : '#888', fontWeight: formData.rules.length > 1500 ? 'bold' : 'normal' }}>
+                                {formData.rules.length}/1500
+                            </span>
+                        </div>
+                        <textarea style={{...styles.textarea, borderColor: formData.rules.length > 1500 ? 'red' : '#E0E0E0'}} name="rules" value={formData.rules} onChange={handleChange} placeholder="Link lub tekst" />
+                        
+                        {/* ZAPISY */}
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px', marginTop: '10px'}}>
+                            <label style={{...styles.label, marginBottom: 0}}>Zapisy</label>
+                            <span style={{ fontSize: '11px', color: formData.default_registration_info_link.length > 1000 ? 'red' : '#888', fontWeight: formData.default_registration_info_link.length > 1000 ? 'bold' : 'normal' }}>
+                                {formData.default_registration_info_link.length}/1000
+                            </span>
+                        </div>
+                        <textarea style={{...styles.textarea, borderColor: formData.default_registration_info_link.length > 1000 ? 'red' : '#E0E0E0'}} name="default_registration_info_link" value={formData.default_registration_info_link} onChange={handleChange} placeholder="Informacje o zapisach" />
                     </div>
 
                     <div style={styles.section}>
@@ -311,7 +337,12 @@ const SetupSchoolInfo = () => {
                         <div style={styles.photoGrid}>
                             {gallery.map((img, i) => (
                                 <div key={i} style={styles.photoWrapper}>
-                                    <img src={img.preview} style={styles.photoImg} alt="Gallery" />
+                                    <ImageWithFallback 
+                                        src={img.preview} 
+                                        style={styles.photoImg} 
+                                        alt="Gallery" 
+                                        fallback={<div style={styles.photoPlaceholder}><span className="material-symbols-outlined">image</span></div>} 
+                                    />
                                     <button type="button" onClick={() => removeImage(i)} style={styles.removeBtn}>X</button>
                                 </div>
                             ))}
@@ -323,7 +354,18 @@ const SetupSchoolInfo = () => {
                         </div>
                     </div>
 
-                    {error && <div style={styles.errorText}>{error}</div>}
+                    {error && (
+                        <div style={{
+                            ...styles.errorText,
+                            backgroundColor: '#ffebee',
+                            padding: '10px',
+                            borderRadius: '6px',
+                            border: '1px solid #ffcdd2',
+                            fontWeight: '600'
+                        }}>
+                            {error}
+                        </div>
+                    )}
 
                     <button type="submit" style={styles.button} disabled={isGeocoding}>
                         {isGeocoding ? 'Weryfikacja adresu...' : (isUpdating ? 'Zapisz zmiany' : 'Zapisz i przejdź dalej')}
@@ -342,8 +384,8 @@ const styles = {
     card: { backgroundColor: 'white', maxWidth: '800px', width: '100%', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' },
     section: { marginBottom: '25px' },
     label: { display: 'block', fontSize: '14px', marginBottom: '8px', color: '#434343', fontWeight: '500' },
-    input: { width: '100%', padding: '12px', border: '1px solid #E0E0E0', borderRadius: '6px', marginBottom: '10px' },
-    textarea: { width: '100%', height: '100px', padding: '12px', border: '1px solid #E0E0E0', borderRadius: '6px', marginBottom: '15px', resize: 'vertical' },
+    input: { width: '100%', padding: '12px', border: '1px solid #E0E0E0', borderRadius: '6px', marginBottom: '10px', boxSizing: 'border-box' },
+    textarea: { width: '100%', height: '100px', padding: '12px', border: '1px solid #E0E0E0', borderRadius: '6px', marginBottom: '5px', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' },
     row: { display: 'flex', gap: '15px' },
     col: { flex: 1 },
     uniformUploadBtn: { padding: '10px 20px', backgroundColor: 'white', color: '#7A33E3', border: '1px solid #7A33E3', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '600' },
@@ -352,10 +394,10 @@ const styles = {
     photoGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' },
     photoWrapper: { position: 'relative', aspectRatio: '16/9' },
     photoImg: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' },
-    photoPlaceholder: { aspectRatio: '16/9', backgroundColor: '#F1F3F5', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc', cursor: 'pointer', border: '1px dashed #ccc' },
+    photoPlaceholder: { aspectRatio: '16/9', backgroundColor: '#F1F3F5', borderRadius: '6px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#ccc', cursor: 'pointer', border: '1px dashed #ccc' },
     removeBtn: { position: 'absolute', top: '5px', right: '5px', background: 'rgba(255, 0, 0, 0.8)', color: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', cursor: 'pointer', fontSize: '12px' },
-    errorText: { color: '#ff4d4f', fontSize: '12px', marginBottom: '12px', fontWeight: '500', textAlign: 'center' },
-    button: { width: '100%', backgroundColor: '#7A33E3', color: 'white', padding: '18px', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }
+    errorText: { color: '#ff4d4f', fontSize: '12px', marginBottom: '12px', textAlign: 'center' },
+    button: { width: '100%', backgroundColor: '#7A33E3', color: 'white', padding: '18px', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }
 };
 
 export default SetupSchoolInfo;

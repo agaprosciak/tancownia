@@ -2,6 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
+// NOWY KOMPONENT: Automatycznie zamienia zepsuty obrazek na podanego fallbacka
+const ImageWithFallback = ({ src, fallback, ...props }) => {
+    const [hasError, setHasError] = useState(false);
+    if (!src || hasError) return fallback;
+    return <img src={src} onError={() => setHasError(true)} {...props} />;
+};
 
 const debounce = (func, delay) => {
     let timer;
@@ -388,11 +394,13 @@ const Home = () => {
                                         <div style={styles.dropdownHeader}>Instruktorzy</div>
                                         {searchSuggestions.instructors.map(i => (
                                             <div key={i.id} style={styles.resultItem} onClick={() => handleResultClick('instructor', i)}>
-                                                {i.photo ? (
-                                                    <img src={i.photo} style={styles.resultAvatarImg} alt={`${i.first_name}`} />
-                                                ) : (
-                                                    <div style={styles.resultAvatar}>{i.first_name[0]}</div>
-                                                )}
+                                                {/* ZMIANA: ImageWithFallback dla instruktorów w wyszukiwarce */}
+                                                <ImageWithFallback 
+                                                    src={i.photo} 
+                                                    style={styles.resultAvatarImg} 
+                                                    alt={`${i.first_name}`} 
+                                                    fallback={<div style={styles.resultAvatar}>{i.first_name[0]}</div>} 
+                                                />
                                                 <div style={styles.resultText}>
                                                     <span style={{fontWeight:'600'}}>{i.first_name} {i.last_name}</span>
                                                     {i.pseudonym && <span style={{fontSize:'12px', color:'#777'}}> "{i.pseudonym}"</span>}
@@ -406,7 +414,13 @@ const Home = () => {
                                         <div style={styles.dropdownHeader}>Szkoły</div>
                                         {searchSuggestions.schools.map(s => (
                                             <div key={s.id} style={styles.resultItem} onClick={() => handleResultClick('school', s)}>
-                                                {s.logo ? <img src={s.logo} style={styles.resultAvatarImg} alt="" /> : <div style={styles.resultAvatar}>{s.name[0]}</div>}
+                                                {/* ZMIANA: ImageWithFallback dla szkół w wyszukiwarce */}
+                                                <ImageWithFallback 
+                                                    src={s.logo} 
+                                                    style={styles.resultAvatarImg} 
+                                                    alt="" 
+                                                    fallback={<div style={styles.resultAvatar}>{s.name[0]}</div>} 
+                                                />
                                                 <div style={styles.resultText}><span style={{fontWeight:'600'}}>{s.name}</span></div>
                                             </div>
                                         ))}
@@ -541,7 +555,13 @@ const Home = () => {
                                     {filteredSchools.map(school => (
                                         <div key={school.id} style={styles.schoolCard} onClick={() => navigate(`/school/${school.id}`)}>
                                             <div style={styles.cardLogoWrapper}>
-                                                {school.logo ? <img src={school.logo} alt={school.name} style={styles.cardLogo} /> : <div style={styles.cardLogoPlaceholder}>{school.name[0]}</div>}
+                                                {/* ZMIANA: ImageWithFallback w sliderze szkół */}
+                                                <ImageWithFallback 
+                                                    src={school.logo} 
+                                                    alt={school.name} 
+                                                    style={styles.cardLogo} 
+                                                    fallback={<div style={styles.cardLogoPlaceholder}>{school.name[0]}</div>} 
+                                                />
                                             </div>
                                             <h3 style={styles.cardTitle}>{school.name}</h3>
                                             <div style={styles.ratingRow}>

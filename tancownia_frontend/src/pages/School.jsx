@@ -6,6 +6,13 @@ import AuthContext from '../context/AuthContext';
 import fbIcon from '../assets/facebook.png';
 import igIcon from '../assets/instagram.png';
 
+// NOWY KOMPONENT: Automatycznie zamienia zepsuty obrazek na podanego fallbacka (np. kółko z literką)
+const ImageWithFallback = ({ src, fallback, ...props }) => {
+    const [hasError, setHasError] = useState(false);
+    if (!src || hasError) return fallback;
+    return <img src={src} onError={() => setHasError(true)} {...props} />;
+};
+
 const TextWithLinks = ({ text }) => {
     if (!text) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -317,13 +324,15 @@ const School = () => {
     const [newReviewText, setNewReviewText] = useState('');
     const [newReviewRating, setNewReviewRating] = useState(0);
     const [submittingReview, setSubmittingReview] = useState(false);
-    
     const [reviewError, setReviewError] = useState(null);
 
     const [rooms, setRooms] = useState([]);
     const [activeRoomId, setActiveRoomId] = useState(null);
     const [selectedClass, setSelectedClass] = useState(null);
     const [selectedPriceItem, setSelectedPriceItem] = useState(null);
+
+    // NOWE: Stan do śledzenia zepsutych obrazków w galerii
+    const [failedGalleryImages, setFailedGalleryImages] = useState(new Set());
 
     const galleryRef = useRef(null);
 
@@ -332,37 +341,27 @@ const School = () => {
 
     const fetchData = async () => {
         try {
-            //Pobranie szkoły
             const schoolRes = await api.get(`schools/${id}/`);
             const schoolData = schoolRes.data;
             setSchool(schoolData);
 
-            // Pobranie grafiku
             const classesRes = await api.get(`classes/?school=${id}`);
             const classesData = classesRes.data;
             setSchedule(classesData);
 
-            // Zakładki Sal (jak jest i szkoła i zajęcia)
             let allFloors = schoolData.floors || [];
-            
-            // Sprawdza, czy w grafiku faktycznie są zajęcia bez przypisanej sali
             const hasClassesWithoutRoom = classesData.some(c => c.periodic && c.floor === null);
 
             if (allFloors.length > 0) {
-                // Jeśli szkoła ma sale, dodawanie "Bez sali" TYLKO JEŚLI są takie zajęcia
                 if (hasClassesWithoutRoom) {
                     allFloors = [...allFloors, { id: 'no_room', name: 'Bez sali' }];
                 }
-                
-                // Ustawianie aktywnej sali tylko jeśli jeszcze nie jest ustawiona
                 if (!activeRoomId) setActiveRoomId(allFloors[0].id); 
             } else {
-                // Jeśli szkoła w ogóle nie zdefiniowała sal, pokaż wszystko (widok domyślny)
                 setActiveRoomId('all'); 
             }
             setRooms(allFloors);
 
-            // Pobieranie opinii
             const reviewsRes = await api.get(`reviews/?school=${id}`);
             setReviews(reviewsRes.data.results || reviewsRes.data);
 
@@ -393,15 +392,19 @@ const School = () => {
     const handleSubmitReview = async () => {
         setReviewError(null); 
 
-        //Sprawdzenie czy to tancerz
         if (!user || user.role !== 'user') {
             setReviewError("Tylko zalogowani tancerze mogą wystawiać opinie!");
             return;
         }
         
-        //Sprawdzenie czy wybrano gwiazdki
         if (newReviewRating === 0) {
             setReviewError("Proszę zaznaczyć gwiazdki!");
+            return;
+        }
+
+        // --- WALIDACJA LIMITU ZNAKÓW ZAMIAST OBCINANIA ---
+        if (newReviewText.length > 1000) {
+            setReviewError(`Twoja opinia jest za długa o ${newReviewText.length - 1000} znaków! Maksimum to 1000.`);
             return;
         }
         
@@ -421,11 +424,9 @@ const School = () => {
             console.error("Błąd API:", err.response);
 
             if (err.response) {
-                // SCENARIUSZ 1: BŁĄD 500 (Duplikat w bazie)
                 if (err.response.status === 500) {
                      setReviewError("Już wystawiłeś opinię dla tej szkoły, możesz ją usunąć albo edytować w swoim profilu.");
                 } 
-                // SCENARIUSZ 2: BŁĄD 400 (Standardowy błąd walidacji DRF)
                 else if (err.response.status === 400) {
                     const data = err.response.data;
                     if (
@@ -437,7 +438,6 @@ const School = () => {
                         setReviewError("Błąd danych. Spróbuj ponownie.");
                     }
                 } 
-                // INNE BŁĘDY
                 else {
                     setReviewError(`Wystąpił błąd serwera (${err.response.status}).`);
                 }
@@ -489,6 +489,9 @@ const School = () => {
     const hasAnyPrices = school.price_list && school.price_list.length > 0;
     const hasAnyCards = school.accepts_multisport || school.accepts_medicover || school.accepts_fitprofit || school.accepts_pzu_sport;
 
+    // NOWE: Filtrowanie uszkodzonych zdjęć z galerii
+    const validGalleryImages = school.images ? school.images.filter(img => !failedGalleryImages.has(img.id)) : [];
+
     return (
         <div style={styles.container}>
             <div style={styles.backButtonWrapper}>
@@ -500,11 +503,12 @@ const School = () => {
                     <div style={styles.infoColumn}>
                         <div style={styles.logoRow}>
                             <div style={styles.logoWrapper}>
-                                {school.logo ? (
-                                    <img src={school.logo} style={styles.logo} alt="Logo" />
-                                ) : (
-                                    <div style={styles.placeholderLogo}>{school.name[0]}</div>
-                                )}
+                                <ImageWithFallback 
+                                    src={school.logo} 
+                                    alt="Logo" 
+                                    style={styles.logo} 
+                                    fallback={<div style={styles.placeholderLogo}>{school.name[0]}</div>} 
+                                />
                             </div>
                             <div style={{flex: 1}}>
                                 <h2 style={styles.schoolName}>{school.name}</h2>
@@ -532,15 +536,23 @@ const School = () => {
                     </div>
 
                     <div style={styles.galleryColumn}>
-                        {school.images && school.images.length > 0 ? (
+                        {validGalleryImages.length > 0 ? (
                             <div style={styles.galleryWrapper}>
                                 <button onClick={() => scrollGallery('left')} style={styles.sliderArrowBtn}>
                                     <span className="material-symbols-outlined" style={{fontSize: '40px'}}>chevron_left</span>
                                 </button>
 
                                 <div ref={galleryRef} style={styles.galleryTrack}>
-                                    {school.images.map((imgObj) => (
-                                        <img key={imgObj.id} src={imgObj.image} style={styles.galleryImg} alt="School Gallery" />
+                                    {validGalleryImages.map((imgObj) => (
+                                        <img 
+                                            key={imgObj.id} 
+                                            src={imgObj.image} 
+                                            style={styles.galleryImg} 
+                                            alt="School Gallery" 
+                                            onError={() => {
+                                                setFailedGalleryImages(prev => new Set(prev).add(imgObj.id));
+                                            }}
+                                        />
                                     ))}
                                 </div>
 
@@ -556,7 +568,6 @@ const School = () => {
 
                 <div style={styles.separator}></div>
 
-                {/* --- GRAFIK --- */}
                 <div style={styles.sectionContainer}>
                     <h3 style={styles.sectionHeaderPurple}>Grafik zajęć</h3>
                     <p style={{fontSize:'13px', color:'#777', marginTop: '-15px', marginBottom: '20px'}}>Kliknij na kafelek, aby zobaczyć szczegóły.</p>
@@ -618,7 +629,6 @@ const School = () => {
                     </div>
                 </div>
 
-                {/* --- NADCHODZĄCE WYDARZENIA --- */}
                 {upcomingEvents.length > 0 && (
                     <div style={styles.sectionContainer}>
                         <h3 style={styles.sectionHeaderPurple}>Nadchodzące wydarzenia</h3>
@@ -646,7 +656,6 @@ const School = () => {
                     </div>
                 )}
 
-                {/* --- MINIONE WYDARZENIA --- */}
                 {pastEvents.length > 0 && (
                     <div style={{...styles.sectionContainer, opacity: 0.7}}>
                         <h3 style={{...styles.sectionHeaderPurple, color: '#999'}}>Minione wydarzenia</h3>
@@ -670,18 +679,18 @@ const School = () => {
 
                 <div style={styles.separator}></div>
 
-                {/* --- INSTRUKTORZY --- */}
                 {school.instructors && school.instructors.length > 0 && (
                     <div style={styles.sectionContainer}>
                         <h3 style={styles.sectionHeaderPurple}>Nasi Instruktorzy</h3>
                         <div style={styles.instructorsGrid}>
                             {school.instructors.map(inst => (
                                 <div key={inst.id} style={styles.instCard} onClick={() => navigate(`/instructor/${inst.id}`)}>
-                                    {inst.photo ? (
-                                        <img src={inst.photo} style={styles.instAvatar} alt={inst.first_name} />
-                                    ) : (
-                                        <div style={styles.instPlaceholder}>{inst.first_name[0]}</div>
-                                    )}
+                                    <ImageWithFallback 
+                                        src={inst.photo} 
+                                        alt={inst.first_name} 
+                                        style={styles.instAvatar} 
+                                        fallback={<div style={styles.instPlaceholder}>{inst.first_name[0]}</div>} 
+                                    />
                                     <p style={styles.instName}>{inst.first_name} {inst.pseudonym ? `"${inst.pseudonym}"` : ''} {inst.last_name}</p>
                                 </div>
                             ))}
@@ -689,10 +698,8 @@ const School = () => {
                     </div>
                 )}
 
-                {/* --- CENNIK I OPINIE --- */}
                 <div style={styles.bottomGrid}>
                     
-                    {/* LEWA */}
                     <div style={{flex: 1}}>
                         <AccordionSection title="Cennik" defaultOpen={true}>
                             {hasAnyPrices || hasAnyCards ? (
@@ -756,14 +763,11 @@ const School = () => {
                         </AccordionSection>
                     </div>
 
-                    {/* PRAWA */}
                     <div style={{flex: 1}}>
                         <h3 style={styles.sectionHeaderPurple}>Opinie</h3>
                         
-                        {/* WIDOCZNOŚĆ TYLKO DLA USER */}
                         {user?.role === 'user' ? (
                             userHasReviewed ? (
-                                // SCENARIUSZ: USER JUŻ OCENIŁ (BLOKADA + INFO)
                                 <div style={styles.alreadyReviewedBox}>
                                     <span className="material-symbols-outlined" style={{fontSize: '20px'}}>check_circle</span>
                                     <div>
@@ -772,14 +776,28 @@ const School = () => {
                                     </div>
                                 </div>
                             ) : (
-                                // --- SCENARIUSZ: FORMULARZ ---
                                 <div style={styles.reviewInputBox}>
                                     <div style={{marginBottom:'10px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                                         <span style={{fontSize:'14px', fontWeight:'bold'}}>Twoja ocena:</span>
+                                        {/* --- NOWY LICZNIK ZNAKÓW --- */}
+                                        <span style={{ 
+                                            fontSize: '11px', 
+                                            color: newReviewText.length > 1000 ? 'red' : '#888',
+                                            fontWeight: newReviewText.length > 1000 ? 'bold' : 'normal'
+                                        }}>
+                                            {newReviewText.length}/1000 znaków
+                                        </span>
+                                    </div>
+                                    
+                                    <div style={{marginBottom: '15px'}}>
                                         <InteractiveStars rating={newReviewRating} setRating={setNewReviewRating} />
                                     </div>
+
                                     <textarea 
-                                        style={styles.reviewTextarea} 
+                                        style={{
+                                            ...styles.reviewTextarea,
+                                            borderColor: newReviewText.length > 1000 ? 'red' : '#ddd'
+                                        }} 
                                         placeholder="Napisz co sądzisz o szkole..."
                                         value={newReviewText}
                                         onChange={(e) => {
@@ -788,7 +806,6 @@ const School = () => {
                                         }}
                                     />
                                     
-                                    {/* Wyświetlanie błędu nad przyciskiem */}
                                     {reviewError && <div style={styles.errorText}>{reviewError}</div>}
 
                                     <button 
@@ -824,7 +841,6 @@ const School = () => {
 
             </div>
 
-            {/* --- POPUP ZAJĘĆ --- */}
             {selectedClass && (
                 <ClassDetailsPopup 
                     cls={selectedClass} 
@@ -837,7 +853,6 @@ const School = () => {
                 />
             )}
 
-            {/* --- POPUP CENNIKA --- */}
             {selectedPriceItem && (
                 <PriceDetailsPopup 
                     item={selectedPriceItem} 
@@ -852,100 +867,65 @@ const School = () => {
 const styles = {
     container: { backgroundColor: '#F8F9FF', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingBottom: '60px', fontFamily: "'Inter', sans-serif" },
     loading: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#555' },
-    
     backButtonWrapper: { width: '100%', maxWidth: '1200px', display: 'flex', justifyContent: 'flex-start', padding: '30px 20px 10px 20px' },
     backArrow: { fontSize: '32px', cursor: 'pointer', color: '#333', fontWeight: 'bold' },
-
     mainCard: { width: '100%', maxWidth: '1200px', backgroundColor: 'white', borderRadius: '24px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' },
-
     topSection: { display: 'flex', gap: '40px', marginBottom: '40px', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' },
     infoColumn: { flex: 1.5, minWidth: '400px' },
     galleryColumn: { flex: 2, minWidth: '400px' }, 
-
     logoRow: { display: 'flex', gap: '25px', alignItems: 'center', marginBottom: '25px' },
     logoWrapper: { width: '120px', height: '120px', borderRadius: '50%', backgroundColor: 'white', border: '1px solid #eee', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' },
     logo: { width: '100%', height: '100%', objectFit: 'cover' }, 
-    
-    placeholderLogo: { 
-        width: '100%', 
-        height: '100%', 
-        backgroundColor: '#eee', 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        fontSize: '50px', 
-        color: '#888', 
-        fontWeight: 'bold' 
-    },
-    
+    placeholderLogo: { width: '100%', height: '100%', backgroundColor: '#eee', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '50px', color: '#888', fontWeight: 'bold' },
     schoolName: { fontSize: '32px', fontWeight: '800', color: '#333', margin: '0 0 10px 0', lineHeight: 1.1 },
     addressBox: { display: 'flex', alignItems: 'center', gap: '8px', color: '#555', marginTop: '10px', fontSize: '15px' },
-
     contactGrid: { display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '20px' },
     contactItemLink: { display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: '#333', fontSize: '13px', padding: '8px 12px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #eee', transition: '0.2s', fontWeight: '500', maxWidth: '48%', cursor: 'pointer' },
     contactItemText: { display: 'flex', alignItems: 'center', gap: '8px', color: '#555', fontSize: '13px', padding: '8px 12px', backgroundColor: '#f9f9f9', borderRadius: '8px', border: '1px solid #eee', fontWeight: '500', maxWidth: '48%' },
     longLink: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px', display: 'inline-block', verticalAlign: 'middle' },
-    
     newsBox: { marginTop: '25px', padding: '15px', backgroundColor: '#fff0f0', borderLeft: '4px solid #d32f2f', borderRadius: '6px', color: '#d32f2f', fontSize: '14px', lineHeight: '1.5' },
-
     galleryWrapper: { display: 'flex', alignItems: 'center', gap: '10px' },
     galleryTrack: { display: 'flex', overflowX: 'auto', gap: '15px', paddingBottom: '10px', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', width: '100%' },
     galleryImg: { width: '450px', height: '280px', borderRadius: '12px', objectFit: 'cover', scrollSnapAlign: 'center', border: '1px solid #eee', flexShrink: 0 },
     noGallery: { width: '100%', height: '250px', backgroundColor: '#f9f9f9', borderRadius: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#888' },
     sliderArrowBtn: { background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s' },
-
     separator: { width: '100%', height: '1px', backgroundColor: '#e0e0e0', margin: '40px 0' },
-
     sectionContainer: { marginBottom: '40px' },
     sectionHeaderPurple: { fontSize: '24px', fontWeight: '800', color: '#7A33E3', marginBottom: '20px' },
-    
     roomTabs: { display: 'flex', gap: '10px', marginBottom: '20px' },
     roomTab: { padding: '10px 20px', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: '0.2s' },
-
     scheduleGridWrapper: { overflowX: 'auto', paddingBottom: '10px' },
     scheduleGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '10px', minWidth: '1000px' },
-    
     dayColumn: { backgroundColor: '#EAEAEA', borderRadius: '10px', padding: '10px', minHeight: '300px' },
     dayHeader: { textAlign: 'center', fontWeight: '800', color: '#7A33E3', marginBottom: '15px', fontSize: '13px' },
     dayContent: { display: 'flex', flexDirection: 'column', gap: '10px' },
-    
     classCard: { backgroundColor: 'white', padding: '12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', cursor: 'pointer', transition: 'transform 0.1s' },
     classTime: { fontWeight: '700', fontSize: '13px', color: '#333' },
     className: { color: '#000', fontWeight: '700', fontSize: '14px' },
     classMeta: { fontSize: '12px', color: '#555', lineHeight: '1.2' },
     classSubItalic: { fontStyle: 'italic', fontSize: '11px', color: '#888' },
-
     eventsList: { display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '10px' },
     eventCard: { minWidth: '250px', backgroundColor: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', border: '1px solid #eee', cursor: 'pointer' },
     eventDate: { color: '#7A33E3', fontWeight: '700', marginBottom: '5px' },
     eventName: { fontSize: '16px', fontWeight: '700', marginBottom: '5px' },
     eventSub: { fontStyle: 'italic', color: '#666', fontSize: '13px', marginBottom: '5px' },
     eventInfo: { fontSize: '13px', color: '#444' },
-
     instructorsGrid: { display: 'flex', gap: '30px', overflowX: 'auto', paddingBottom: '10px' },
     instCard: { display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '120px', cursor: 'pointer', transition: 'transform 0.2s' },
     instAvatar: { width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', marginBottom: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
     instPlaceholder: { width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '30px', color: '#888', marginBottom: '10px' },
     instName: { fontWeight: '600', textAlign: 'center', color: '#333' },
-
     bottomGrid: { display: 'flex', gap: '50px', flexWrap: 'wrap', alignItems: 'flex-start' },
     priceRow: { display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px dashed #eee' },
-    
     cardBadge: { backgroundColor: '#7A33E3', color: 'white', fontSize: '11px', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold' },
-    
     registrationBox: { marginTop: '15px', padding: '15px', backgroundColor: 'rgba(122, 51, 227, 0.1)', borderRadius: '8px', fontSize: '14px', border: '1px solid rgba(122, 51, 227, 0.2)' },
-
     reviewInputBox: { backgroundColor: '#F9F9F9', padding: '20px', borderRadius: '12px', marginBottom: '30px' },
-    reviewTextarea: { width: '100%', height: '80px', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '10px', fontFamily: 'inherit', resize: 'none' },
+    reviewTextarea: { width: '100%', height: '80px', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '10px', fontFamily: 'inherit', resize: 'none', boxSizing: 'border-box' },
     submitBtn: { backgroundColor: '#7A33E3', color: 'white', padding: '10px 20px', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', float: 'right' },
-    
-    errorText: { color: '#d32f2f', fontSize: '13px', fontWeight: '500', marginBottom: '10px', textAlign: 'right' }, // NOWE: Styl błędu
-    
+    errorText: { color: '#d32f2f', fontSize: '13px', fontWeight: '600', marginBottom: '10px', textAlign: 'right', backgroundColor: '#ffebee', padding: '8px', borderRadius: '6px', border: '1px solid #ffcdd2' }, 
     alreadyReviewedBox: { marginBottom: '20px', padding: '20px', backgroundColor: '#E8F5E9', borderRadius: '12px', color: '#2E7D32', fontSize: '14px', border: '1px solid #C8E6C9', display: 'flex', alignItems: 'center', gap: '15px' },
-
     reviewsList: { display: 'flex', flexDirection: 'column', gap: '20px' },
     reviewItem: { backgroundColor: '#F9F9F9', padding: '20px', borderRadius: '12px' },
-
     popupOverlay: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center' },
     popupContent: { backgroundColor: 'white', borderRadius: '16px', padding: '30px', width: '90%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' },
     popupHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '15px' },
@@ -954,10 +934,8 @@ const styles = {
     popupItem: { display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '15px' },
     popupIcon: { color: '#7A33E3', fontSize: '24px' },
     popupActionBtn: { backgroundColor: '#333', color: 'white', border: 'none', padding: '12px 40px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px' },
-    
     statusBadgeGreen: { backgroundColor: '#E8F5E9', color: '#2E7D32', padding: '6px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold', border: '1px solid #C8E6C9' },
     statusBadgeRed: { backgroundColor: '#FFEBEE', color: '#C62828', padding: '6px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold', border: '1px solid #FFCDD2' },
-    
     clickableInstructor: { cursor: 'pointer', color: '#7A33E3', fontWeight: '600', textDecoration: 'underline', padding: '2px 6px', backgroundColor: '#f0f0f0', borderRadius: '4px' }
 };
 

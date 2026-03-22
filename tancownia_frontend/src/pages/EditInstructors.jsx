@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import AddInstructorPopup from '../components/AddInstructorPopup';
 
+// NOWY KOMPONENT: Automatycznie zamienia zepsuty obrazek na podanego fallbacka
+const ImageWithFallback = ({ src, fallback, ...props }) => {
+    const [hasError, setHasError] = useState(false);
+    if (!src || hasError) return fallback;
+    return <img src={src} onError={() => setHasError(true)} {...props} />;
+};
+
 const EditInstructors = () => {
     const navigate = useNavigate();
     const [instructors, setInstructors] = useState([]);
@@ -68,13 +75,17 @@ const EditInstructors = () => {
                         {instructors.map((inst) => (
                             <div key={inst.id} style={styles.itemWrapper} onClick={() => handleEditClick(inst)}>
                                 <div style={styles.circle}>
-                                    {inst.photo ? (
-                                        <img src={inst.photo} alt={`${inst.first_name} ${inst.last_name}`} style={styles.img} />
-                                    ) : (
-                                        <span style={styles.initials}>
-                                            {getInitials(inst.first_name, inst.last_name)}
-                                        </span>
-                                    )}
+                                    {/* ZMIANA: ImageWithFallback dla zdjęcia instruktora w edycji */}
+                                    <ImageWithFallback 
+                                        src={inst.photo} 
+                                        alt={`${inst.first_name} ${inst.last_name}`} 
+                                        style={styles.img} 
+                                        fallback={
+                                            <span style={styles.initials}>
+                                                {getInitials(inst.first_name, inst.last_name)}
+                                            </span>
+                                        } 
+                                    />
                                 </div>
                                 <div style={styles.name}>
                                     {inst.first_name} {inst.pseudonym ? `"${inst.pseudonym}"` : ""} {inst.last_name}

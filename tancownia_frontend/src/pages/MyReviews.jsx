@@ -14,6 +14,7 @@ const MyReviews = () => {
     const [editRating, setEditRating] = useState(0);
     const [editText, setEditText] = useState('');
     const [saving, setSaving] = useState(false);
+    const [localError, setLocalError] = useState(''); // Stan na błąd walidacji długości
 
     useEffect(() => {
         if (!user) return;
@@ -60,18 +61,28 @@ const MyReviews = () => {
     };
 
     const startEditing = (review) => {
+        setLocalError(''); // Reset błędu
         setEditingId(review.id);
         setEditRating(review.rating);
-        setEditText(review.description);
+        setEditText(review.description || '');
     };
 
     const cancelEditing = () => {
         setEditingId(null);
         setEditRating(0);
         setEditText('');
+        setLocalError('');
     };
 
     const saveEdit = async () => {
+        setLocalError('');
+        
+        // --- WALIDACJA LIMITU ZNAKÓW ---
+        if (editText.length > 1000) {
+            setLocalError(`Twoja opinia jest za długa o ${editText.length - 1000} znaków! Maksimum to 1000.`);
+            return;
+        }
+
         setSaving(true);
         try {
             await api.patch(`reviews/${editingId}/`, {
@@ -89,7 +100,7 @@ const MyReviews = () => {
             cancelEditing();
         } catch (err) {
             console.error("Błąd edycji:", err);
-            alert("Nie udało się zapisać zmian.");
+            setLocalError("Nie udało się zapisać zmian na serwerze.");
         } finally {
             setSaving(false);
         }
@@ -126,11 +137,30 @@ const MyReviews = () => {
                                         ))}
                                     </div>
 
+                                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end'}}>
+                                        <span style={{fontSize:'12px', color:'#555', fontWeight:'600'}}>Treść opinii:</span>
+                                        <span style={{ 
+                                            fontSize: '11px', 
+                                            color: editText.length > 1000 ? 'red' : '#888',
+                                            fontWeight: editText.length > 1000 ? 'bold' : 'normal'
+                                        }}>
+                                            {editText.length}/1000
+                                        </span>
+                                    </div>
+
                                     <textarea 
-                                        style={styles.editTextarea} 
+                                        style={{
+                                            ...styles.editTextarea,
+                                            borderColor: editText.length > 1000 ? 'red' : '#ddd'
+                                        }} 
                                         value={editText} 
-                                        onChange={(e) => setEditText(e.target.value)}
+                                        onChange={(e) => {
+                                            setEditText(e.target.value);
+                                            if (localError) setLocalError('');
+                                        }}
                                     />
+
+                                    {localError && <div style={styles.localErrorMsg}>{localError}</div>}
 
                                     <div style={{display:'flex', gap:'10px', marginTop:'5px'}}>
                                         <button style={styles.saveBtn} onClick={saveEdit} disabled={saving}>
@@ -235,9 +265,11 @@ const styles = {
     
     emptyState: { textAlign: 'center', padding: '40px', color: '#777' },
 
-    editTextarea: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', minHeight: '80px', fontFamily: 'inherit' },
+    editTextarea: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', minHeight: '80px', fontFamily: 'inherit', boxSizing: 'border-box' },
     saveBtn: { backgroundColor: '#7A33E3', color: 'white', border: 'none', padding: '8px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' },
-    cancelBtn: { backgroundColor: 'transparent', color: '#555', border: '1px solid #ccc', padding: '8px 20px', borderRadius: '6px', cursor: 'pointer' }
+    cancelBtn: { backgroundColor: 'transparent', color: '#555', border: '1px solid #ccc', padding: '8px 20px', borderRadius: '6px', cursor: 'pointer' },
+    
+    localErrorMsg: { color: '#d32f2f', fontSize: '13px', fontWeight: '600', backgroundColor: '#ffebee', padding: '8px', borderRadius: '6px', border: '1px solid #ffcdd2' }
 };
 
 export default MyReviews;
