@@ -18,7 +18,7 @@ const SetupSchoolInfo = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(true);
     const [isUpdating, setIsUpdating] = useState(false);
-    const [isGeocoding, setIsGeocoding] = useState(false); // Nowy stan dla ładowania mapy
+    const [isGeocoding, setIsGeocoding] = useState(false); 
 
     const isEditMode = location.state?.fromProfile;
 
@@ -39,20 +39,39 @@ const SetupSchoolInfo = () => {
             .then(res => {
                 if (res.data) {
                     setIsUpdating(true);
-                    const fields = {};
-                    Object.keys(formData).forEach(key => {
-                        fields[key] = res.data[key] || '';
+                    const d = res.data;
+                    
+                    // RĘCZNE PRZYPISANIE - najpewniejsza metoda
+                    setFormData({
+                        name: d.name || '',
+                        email: d.email || '',
+                        phone: d.phone || '',
+                        street: d.street || '',
+                        build_no: d.build_no || '', 
+                        postal_code: d.postal_code || '',
+                        city: d.city || '',
+                        website: d.website || '',
+                        instagram: d.instagram || '',
+                        facebook: d.facebook || '',
+                        description: d.description || '',
+                        rules: d.rules || '',
+                        default_registration_info_link: d.default_registration_info_link || '',
+                        county: d.county || '',
+                        state: d.state || '',
+                        latitude: d.latitude || '',
+                        longitude: d.longitude || ''
                     });
-                    setFormData(fields);
-                    if (res.data.logo) setLogoPreview(res.data.logo);
-                    if (res.data.images) {
-                        const existingImages = res.data.images.map(img => ({
+
+                    if (d.logo) setLogoPreview(d.logo);
+                    if (d.images) {
+                        const existingImages = d.images.map(img => ({
                             id: img.id, preview: img.image, isExisting: true 
                         }));
                         setGallery(existingImages);
                     }
                 }
             })
+            .catch(err => console.error("Błąd API:", err))
             .finally(() => setLoading(false));
     }, []);
 
@@ -93,7 +112,7 @@ const SetupSchoolInfo = () => {
         e.preventDefault();
         setError('');
 
-        // --- WALIDACJA LIMITÓW ZNAKÓW ---
+        // --- WALIDACJA LIMITÓW DŁUGOŚCI ---
         if (formData.description.length > 2500) {
             setError(`Opis szkoły jest za długi o ${formData.description.length - 2500} znaków!`);
             return;
@@ -107,7 +126,7 @@ const SetupSchoolInfo = () => {
             return;
         }
 
-        // --- WALIDACJA SOCIAL MEDIA ---
+        // WALIDACJA SOCIALI
         if (formData.instagram && (!formData.instagram.toLowerCase().includes('instagram.com') || !formData.instagram.toLowerCase().includes('http'))) {
             setError("Link do Instagrama musi być pełnym adresem (http... instagram.com)");
             return;
@@ -117,35 +136,11 @@ const SetupSchoolInfo = () => {
             return;
         }
 
-        // --- WALIDACJA NR TELEFONU ---
+        // WALIDACJA TELEFONU
         const cleanPhone = formData.phone.replace(/[\s-]/g, '');
         const phoneRegex = /^(\+48)?\d{9,15}$/; 
         if (formData.phone && !phoneRegex.test(cleanPhone)) {
-            setError("Podaj poprawny numer telefonu (minimum 9 cyfr).");
-            return;
-        }
-
-        // --- KOD POCZTOWY ---
-        const zipRegex = /^[0-9]{2}-[0-9]{3}$/;
-        if (!zipRegex.test(formData.postal_code)) {
-            setError("Kod pocztowy musi być w formacie XX-XXX (np. 35-310).");
-            return;
-        }
-
-        // --- DŁUGOŚĆ ADRESU ---
-        if (formData.city.trim().length < 3) {
-            setError("Nazwa miejscowości jest za krótka.");
-            return;
-        }
-        if (formData.street.trim().length < 3) {
-            setError("Nazwa ulicy jest za krótka.");
-            return;
-        }
-
-        // --- ZNAKI SPECJALNE ---
-        const safeTextRegex = /^[a-zA-Z0-9\s\/\-\.,ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+$/;
-        if (!safeTextRegex.test(formData.city) || !safeTextRegex.test(formData.street) || !safeTextRegex.test(formData.build_no)) {
-            setError("Adres zawiera niedozwolone znaki.");
+            setError("Podaj poprawny numer telefonu.");
             return;
         }
 
@@ -154,85 +149,56 @@ const SetupSchoolInfo = () => {
         
         try {
             const params = new URLSearchParams({
-                format: 'json',
-                addressdetails: 1,
-                limit: 1,
-                street: `${formData.build_no} ${formData.street}`, 
-                city: formData.city,
-                postalcode: formData.postal_code,
-                countrycodes: 'pl'
+                format: 'json', addressdetails: 1, limit: 1, street: `${formData.build_no} ${formData.street}`, 
+                city: formData.city, postalcode: formData.postal_code, countrycodes: 'pl'
             });
-
-            const geoResponse = await fetch(
-                `https://nominatim.openstreetmap.org/search?${params.toString()}`,
-                { headers: { 'User-Agent': 'Tancownia-App-v1' } }
-            );
-            
+            const geoResponse = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, { headers: { 'User-Agent': 'Tancownia-App-v1' } });
             const geoResult = await geoResponse.json();
             
             if (!geoResult || geoResult.length === 0) {
                 setIsGeocoding(false);
-                setError("Nie znaleziono takiego adresu w Polsce. Sprawdź ulicę, numer i kod pocztowy.");
+                setError("Nie znaleziono adresu. Sprawdź ulicę, numer i kod pocztowy.");
                 return; 
             }
 
             const res = geoResult[0];
-            const apiPostcode = res.address?.postcode; 
-
-            if (apiPostcode) {
-                const cleanApiCode = apiPostcode.replace('-', '');
-                const cleanUserCode = formData.postal_code.replace('-', '');
-                if (cleanApiCode !== cleanUserCode) {
-                    setIsGeocoding(false);
-                    setError(`Niezgodność danych! Dla adresu ${formData.street} ${formData.build_no} system map wskazuje kod pocztowy: ${apiPostcode}. Popraw go.`);
-                    return; 
-                }
-            }
-
             geoData = {
-                lat: parseFloat(res.lat).toFixed(6),
-                lon: parseFloat(res.lon).toFixed(6),
+                lat: parseFloat(res.lat).toFixed(6), lon: parseFloat(res.lon).toFixed(6),
                 state: res.address.state || res.address.province || '',
                 county: res.address.county || res.address.city || ''
             };
-
         } catch (err) { 
-            console.error("Błąd geokodowania:", err);
             setIsGeocoding(false);
-            setError("Wystąpił błąd weryfikacji adresu. Spróbuj ponownie później.");
+            setError("Błąd weryfikacji adresu.");
             return;
         }
 
         setIsGeocoding(false);
 
-        // --- PRZYGOTOWANIE DANYCH DO WYSYŁKI ---
         const data = new FormData();
-        Object.keys(formData).forEach(key => data.append(key, formData[key].trim()));
+        Object.keys(formData).forEach(key => {
+            const val = formData[key];
+            data.append(key, typeof val === 'string' ? val.trim() : val);
+        });
+
         data.set('latitude', geoData.lat);
         data.set('longitude', geoData.lon);
         data.set('state', geoData.state);
         data.set('county', geoData.county);
 
         if (logo) data.append('logo', logo);
-        gallery.forEach(img => {
-            if (!img.isExisting && img.file) data.append('uploaded_images', img.file);
-        });
+        gallery.forEach(img => { if (!img.isExisting && img.file) data.append('uploaded_images', img.file); });
         deletedImages.forEach(id => data.append('deleted_images', id));
 
         try {
             const method = isUpdating ? 'put' : 'post';
             const url = isUpdating ? 'schools/my_school/' : 'schools/';
-            const response = await api[method](url, data, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            await api[method](url, data, { headers: { 'Content-Type': 'multipart/form-data' } });
             
-            if (response.status === 201 || response.status === 200) {
-                if (isEditMode) navigate('/profile');
-                else navigate('/setup-rooms');
-            }
+            if (isEditMode) navigate('/profile');
+            else navigate('/setup-rooms');
         } catch (err) {
-            const serverMsg = err.response?.data ? Object.values(err.response.data).flat()[0] : "Błąd zapisu danych.";
-            setError(serverMsg);
+            setError(err.response?.data ? Object.values(err.response.data).flat()[0] : "Błąd zapisu danych.");
         }
     };
 
@@ -283,8 +249,20 @@ const SetupSchoolInfo = () => {
 
                     <div style={styles.row}>
                         <div style={{flex: 2}}><label style={styles.label}>Ulica*</label><input style={styles.input} name="street" value={formData.street} required onChange={handleChange} /></div>
-                        <div style={{flex: 1}}><label style={styles.label}>Nr*</label><input style={styles.input} name="build_no" value={formData.build_no} placeholder="np. 12 lub 12/4" required onChange={handleChange} /></div>
+                        
+                        <div style={{flex: 1}}>
+                            <label style={styles.label}>Nr*</label>
+                            <input 
+                                style={styles.input} 
+                                name="build_no" 
+                                value={formData.build_no} // <--- TO NAPRAWIA TWOJE BUILD NO
+                                placeholder="np. 12" 
+                                required 
+                                onChange={handleChange} 
+                            />
+                        </div>
                     </div>
+
                     <div style={styles.row}>
                         <div style={styles.col}><label style={styles.label}>Kod pocztowy*</label><input style={styles.input} name="postal_code" value={formData.postal_code} required onChange={handleChange} placeholder="XX-XXX" /></div>
                         <div style={styles.col}><label style={styles.label}>Miejscowość*</label><input style={styles.input} name="city" value={formData.city} required onChange={handleChange} /></div>
@@ -294,36 +272,27 @@ const SetupSchoolInfo = () => {
                         <label style={styles.label}>Strona internetowa</label>
                         <input style={styles.input} type="url" name="website" value={formData.website} placeholder="Link do strony" onChange={handleChange} />
                         <div style={styles.row}>
-                            <div style={styles.col}><label style={styles.label}>Instagram</label><input style={styles.input} name="instagram" value={formData.instagram} placeholder="http://instagram.com/twoja_szkola" onChange={handleChange} /></div>
-                            <div style={styles.col}><label style={styles.label}>Facebook</label><input style={styles.input} name="facebook" value={formData.facebook} placeholder="http://facebook.com/twoja_szkola" onChange={handleChange} /></div>
+                            <div style={styles.col}><label style={styles.label}>Instagram</label><input style={styles.input} name="instagram" value={formData.instagram} placeholder="http://instagram.com/uzytkownik" onChange={handleChange} /></div>
+                            <div style={styles.col}><label style={styles.label}>Facebook</label><input style={styles.input} name="facebook" value={formData.facebook} placeholder="http://facebook.com/uzytkownik" onChange={handleChange} /></div>
                         </div>
                     </div>
 
                     <div style={styles.section}>
-                        {/* OPIS SZKOŁY */}
-                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px'}}>
-                            <label style={{...styles.label, marginBottom: 0}}>Opis szkoły*</label>
-                            <span style={{ fontSize: '11px', color: formData.description.length > 2500 ? 'red' : '#888', fontWeight: formData.description.length > 2500 ? 'bold' : 'normal' }}>
-                                {formData.description.length}/2500
-                            </span>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end'}}>
+                            <label style={styles.label}>Opis szkoły*</label>
+                            <span style={{fontSize:'11px', color: formData.description.length > 2500 ? 'red' : '#888'}}>{formData.description.length}/2500</span>
                         </div>
                         <textarea style={{...styles.textarea, borderColor: formData.description.length > 2500 ? 'red' : '#E0E0E0'}} name="description" value={formData.description} required onChange={handleChange} />
                         
-                        {/* REGULAMIN */}
-                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px', marginTop: '10px'}}>
-                            <label style={{...styles.label, marginBottom: 0}}>Regulamin</label>
-                            <span style={{ fontSize: '11px', color: formData.rules.length > 1500 ? 'red' : '#888', fontWeight: formData.rules.length > 1500 ? 'bold' : 'normal' }}>
-                                {formData.rules.length}/1500
-                            </span>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end'}}>
+                            <label style={styles.label}>Regulamin</label>
+                            <span style={{fontSize:'11px', color: formData.rules.length > 1500 ? 'red' : '#888'}}>{formData.rules.length}/1500</span>
                         </div>
                         <textarea style={{...styles.textarea, borderColor: formData.rules.length > 1500 ? 'red' : '#E0E0E0'}} name="rules" value={formData.rules} onChange={handleChange} placeholder="Link lub tekst" />
                         
-                        {/* ZAPISY */}
-                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px', marginTop: '10px'}}>
-                            <label style={{...styles.label, marginBottom: 0}}>Zapisy</label>
-                            <span style={{ fontSize: '11px', color: formData.default_registration_info_link.length > 1000 ? 'red' : '#888', fontWeight: formData.default_registration_info_link.length > 1000 ? 'bold' : 'normal' }}>
-                                {formData.default_registration_info_link.length}/1000
-                            </span>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end'}}>
+                            <label style={styles.label}>Zapisy</label>
+                            <span style={{fontSize:'11px', color: formData.default_registration_info_link.length > 1000 ? 'red' : '#888'}}>{formData.default_registration_info_link.length}/1000</span>
                         </div>
                         <textarea style={{...styles.textarea, borderColor: formData.default_registration_info_link.length > 1000 ? 'red' : '#E0E0E0'}} name="default_registration_info_link" value={formData.default_registration_info_link} onChange={handleChange} placeholder="Informacje o zapisach" />
                     </div>
@@ -337,35 +306,17 @@ const SetupSchoolInfo = () => {
                         <div style={styles.photoGrid}>
                             {gallery.map((img, i) => (
                                 <div key={i} style={styles.photoWrapper}>
-                                    <ImageWithFallback 
-                                        src={img.preview} 
-                                        style={styles.photoImg} 
-                                        alt="Gallery" 
-                                        fallback={<div style={styles.photoPlaceholder}><span className="material-symbols-outlined">image</span></div>} 
-                                    />
+                                    <ImageWithFallback src={img.preview} style={styles.photoImg} alt="Gallery" fallback={<div style={styles.photoPlaceholder}><span className="material-symbols-outlined">image</span></div>} />
                                     <button type="button" onClick={() => removeImage(i)} style={styles.removeBtn}>X</button>
                                 </div>
                             ))}
                             {[...Array(Math.max(0, 9 - gallery.length))].map((_, i) => (
-                                <div key={i} style={styles.photoPlaceholder} onClick={() => gallery.length < 9 && fileInputRef.current.click()}>
-                                    <span className="material-symbols-outlined">image</span>
-                                </div>
+                                <div key={i} style={styles.photoPlaceholder} onClick={() => gallery.length < 9 && fileInputRef.current.click()}><span className="material-symbols-outlined">image</span></div>
                             ))}
                         </div>
                     </div>
 
-                    {error && (
-                        <div style={{
-                            ...styles.errorText,
-                            backgroundColor: '#ffebee',
-                            padding: '10px',
-                            borderRadius: '6px',
-                            border: '1px solid #ffcdd2',
-                            fontWeight: '600'
-                        }}>
-                            {error}
-                        </div>
-                    )}
+                    {error && <div style={{...styles.errorText, backgroundColor: '#ffebee', padding: '10px', borderRadius: '6px', border: '1px solid #ffcdd2'}}>{error}</div>}
 
                     <button type="submit" style={styles.button} disabled={isGeocoding}>
                         {isGeocoding ? 'Weryfikacja adresu...' : (isUpdating ? 'Zapisz zmiany' : 'Zapisz i przejdź dalej')}
@@ -394,9 +345,9 @@ const styles = {
     photoGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' },
     photoWrapper: { position: 'relative', aspectRatio: '16/9' },
     photoImg: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' },
-    photoPlaceholder: { aspectRatio: '16/9', backgroundColor: '#F1F3F5', borderRadius: '6px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#ccc', cursor: 'pointer', border: '1px dashed #ccc' },
+    photoPlaceholder: { aspectRatio: '16/9', backgroundColor: '#F1F3F5', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc', cursor: 'pointer', border: '1px dashed #ccc' },
     removeBtn: { position: 'absolute', top: '5px', right: '5px', background: 'rgba(255, 0, 0, 0.8)', color: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', cursor: 'pointer', fontSize: '12px' },
-    errorText: { color: '#ff4d4f', fontSize: '12px', marginBottom: '12px', textAlign: 'center' },
+    errorText: { color: '#ff4d4f', fontSize: '12px', marginBottom: '12px', textAlign: 'center', fontWeight: '600' },
     button: { width: '100%', backgroundColor: '#7A33E3', color: 'white', padding: '18px', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }
 };
 
