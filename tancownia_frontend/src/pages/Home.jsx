@@ -21,7 +21,6 @@ const debounce = (func, delay) => {
     };
 };
 
-
 const normalizeRegion = (text) => {
     if (!text) return '';
     return text.toLowerCase()
@@ -31,7 +30,6 @@ const normalizeRegion = (text) => {
         .replace(/\s+/g, ' ')
         .trim();
 };
-
 
 const getCityData = async (query) => {
     if (!query || query.length < 2) return [];
@@ -70,6 +68,9 @@ const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
 const Home = () => {
     const navigate = useNavigate();
     
+    // NOWE: Stan do wykrywania urządzeń mobilnych
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
     const [schools, setSchools] = useState([]);
     const [instructors, setInstructors] = useState([]);
     const [allStyles, setAllStyles] = useState([]);
@@ -102,6 +103,9 @@ const Home = () => {
     const contentCityWrapperRef = useRef(null);
 
     useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 768);
+        window.addEventListener('resize', handleResize);
+        
         const fetchData = async () => {
             try {
                 const [schoolsRes, instRes, stylesRes] = await Promise.all([
@@ -126,7 +130,11 @@ const Home = () => {
             if (contentCityWrapperRef.current && !contentCityWrapperRef.current.contains(event.target)) setShowContentCityDropdown(false);
         };
         document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
+        
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
     }, []);
 
     // LOGIKA FILTROWANIA
@@ -371,17 +379,17 @@ const Home = () => {
     const prevSlide = () => { if (currentSlide > 0) setCurrentSlide(currentSlide - 1); };
 
     return (
-        <div style={styles.container}>
+        <div style={{ ...styles.container, paddingBottom: isMobile ? '30px' : '60px' }}>
             
-            <div style={styles.heroSection}>
-                <h1 style={styles.heroTitle}>Znajdź zajęcia taneczne idealne dla siebie!</h1>
+            <div style={{ ...styles.heroSection, paddingTop: isMobile ? '30px' : '60px', paddingBottom: isMobile ? '20px' : '40px', paddingLeft: isMobile ? '20px' : '0', paddingRight: isMobile ? '20px' : '0' }}>
+                <h1 style={{ ...styles.heroTitle, fontSize: isMobile ? '24px' : '32px' }}>Znajdź zajęcia taneczne idealne dla siebie!</h1>
                 
-                <div style={styles.searchBarContainer}>
+                <div style={{ ...styles.searchBarContainer, flexDirection: isMobile ? 'column' : 'row' }}>
                     <div style={{flex: 2, position: 'relative'}} ref={searchWrapperRef}>
                         <input 
                             type="text" 
                             placeholder="Wyszukaj (styl, studio, instruktor)" 
-                            style={styles.searchInput}
+                            style={{ ...styles.searchInput, borderRight: isMobile ? 'none' : '1px solid #eee', borderBottom: isMobile ? '1px solid #eee' : 'none' }}
                             value={searchQuery}
                             onChange={handleMainSearch}
                             onKeyDown={(e) => e.key === 'Enter' && handleEnterSearch()}
@@ -394,7 +402,6 @@ const Home = () => {
                                         <div style={styles.dropdownHeader}>Instruktorzy</div>
                                         {searchSuggestions.instructors.map(i => (
                                             <div key={i.id} style={styles.resultItem} onClick={() => handleResultClick('instructor', i)}>
-                                                {/* ZMIANA: ImageWithFallback dla instruktorów w wyszukiwarce */}
                                                 <ImageWithFallback 
                                                     src={i.photo} 
                                                     style={styles.resultAvatarImg} 
@@ -414,7 +421,6 @@ const Home = () => {
                                         <div style={styles.dropdownHeader}>Szkoły</div>
                                         {searchSuggestions.schools.map(s => (
                                             <div key={s.id} style={styles.resultItem} onClick={() => handleResultClick('school', s)}>
-                                                {/* ZMIANA: ImageWithFallback dla szkół w wyszukiwarce */}
                                                 <ImageWithFallback 
                                                     src={s.logo} 
                                                     style={styles.resultAvatarImg} 
@@ -444,7 +450,7 @@ const Home = () => {
                         )}
                     </div>
                     
-                    <div style={styles.locationWrapper} ref={heroCityWrapperRef}>
+                    <div style={{ ...styles.locationWrapper, padding: isMobile ? '15px' : '0 15px' }} ref={heroCityWrapperRef}>
                         <span className="material-symbols-outlined" style={styles.locationIcon}>location_on</span>
                         <input 
                             type="text"
@@ -473,12 +479,12 @@ const Home = () => {
                         )}
                     </div>
 
-                    <button style={styles.searchBtn} onClick={handleEnterSearch}>
+                    <button style={{ ...styles.searchBtn, width: isMobile ? '100%' : '70px', padding: isMobile ? '15px' : '0' }} onClick={handleEnterSearch}>
                         <span className="material-symbols-outlined">search</span>
                     </button>
                 </div>
 
-                <div style={styles.checkboxContainer}>
+                <div style={{ ...styles.checkboxContainer, justifyContent: isMobile ? 'center' : 'flex-end', padding: isMobile ? '0 20px' : '0' }}>
                     <input 
                         type="checkbox" 
                         id="radius" 
@@ -520,28 +526,28 @@ const Home = () => {
                 </div>
             </div>
 
-            <div style={styles.section}>
-                <h2 style={styles.sectionTitle}>
+            <div style={{ ...styles.section, padding: isMobile ? '20px' : '40px', marginTop: isMobile ? '30px' : '60px', boxSizing: 'border-box' }}>
+                <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '20px' : '24px' }}>
                     Najpopularniejsze style w {confirmedContentCity === 'Cała Polska' ? 'Polsce' : <span style={{fontWeight: '700'}}>{confirmedContentCity}</span>}:
                 </h2>
                 {topStyles.length > 0 ? (
-                    <div style={styles.stylesGrid}>
+                    <div style={{ ...styles.stylesGrid, gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: isMobile ? '15px' : '30px' }}>
                         {topStyles.map((styleName, index) => (
                             <div key={index} style={styles.styleItem} onClick={() => {
                                 goToSearch(styleName, selectedContentLocation, confirmedContentCity);
                             }}>
                                 <span className="material-symbols-outlined" style={styles.trendIcon}>trending_up</span>
-                                <span style={styles.styleLabel}>{styleName}</span>
+                                <span style={{ ...styles.styleLabel, fontSize: isMobile ? '15px' : '18px' }}>{styleName}</span>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <p style={styles.emptyState}>Brak danych o stylach w tym miejscu. Spróbuj zmienić lokalizację na dole.</p>
+                    <p style={styles.emptyState}>Brak danych o stylach w tym miejscu. Spróbuj zmienić lokalizację powyżej.</p>
                 )}
             </div>
 
-            <div style={styles.section}>
-                <h2 style={styles.sectionTitle}>
+            <div style={{ ...styles.section, padding: isMobile ? '20px' : '40px', marginTop: isMobile ? '30px' : '60px', boxSizing: 'border-box' }}>
+                <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '20px' : '24px' }}>
                     Najlepiej oceniane szkoły w {confirmedContentCity === 'Cała Polska' ? 'Polsce' : <span style={{fontWeight: '700'}}>{confirmedContentCity}</span>}:
                 </h2>
                 <div style={styles.sliderContainer}>
@@ -555,7 +561,6 @@ const Home = () => {
                                     {filteredSchools.map(school => (
                                         <div key={school.id} style={styles.schoolCard} onClick={() => navigate(`/school/${school.id}`)}>
                                             <div style={styles.cardLogoWrapper}>
-                                                {/* ZMIANA: ImageWithFallback w sliderze szkół */}
                                                 <ImageWithFallback 
                                                     src={school.logo} 
                                                     alt={school.name} 
@@ -586,8 +591,8 @@ const Home = () => {
                 </div>
             </div>
 
-            <div style={styles.ctaContainer}>
-                <button style={styles.bigCtaBtn} onClick={() => goToSearch('', selectedContentLocation, confirmedContentCity)}>
+            <div style={{ ...styles.ctaContainer, padding: isMobile ? '0 20px' : '0' }}>
+                <button style={{ ...styles.bigCtaBtn, padding: isMobile ? '15px 20px' : '18px 60px', fontSize: isMobile ? '15px' : '18px' }} onClick={() => goToSearch('', selectedContentLocation, confirmedContentCity)}>
                     Zobacz wszystkie szkoły tańca w {confirmedContentCity === 'Cała Polska' ? 'Polsce' : confirmedContentCity}
                 </button>
             </div>
@@ -601,12 +606,12 @@ const styles = {
     heroTitle: { fontSize: '32px', fontWeight: '400', marginBottom: '40px', color: '#000', textAlign: 'center' },
     
     searchBarContainer: { display: 'flex', width: '100%', maxWidth: '800px', backgroundColor: 'white', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', borderRadius: '4px', position: 'relative' },
-    searchInput: { width: '100%', padding: '18px 25px', border: 'none', fontSize: '16px', outline: 'none', borderRight: '1px solid #eee' },
+    searchInput: { width: '100%', padding: '18px 25px', border: 'none', fontSize: '16px', outline: 'none', borderRight: '1px solid #eee', boxSizing: 'border-box' },
     
-    locationWrapper: { flex: 1, display: 'flex', alignItems: 'center', padding: '0 15px', position: 'relative', backgroundColor: 'white' },
+    locationWrapper: { flex: 1, display: 'flex', alignItems: 'center', padding: '0 15px', position: 'relative', backgroundColor: 'white', boxSizing: 'border-box' },
     locationIcon: { color: '#333', marginRight: '5px' },
     cityInput: { width: '100%', border: 'none', fontSize: '16px', outline: 'none', fontWeight: '500', color: '#333' },
-    searchBtn: { backgroundColor: '#7A33E3', border: 'none', width: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' },
+    searchBtn: { backgroundColor: '#7A33E3', border: 'none', width: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white', borderRadius: '0 4px 4px 0' },
 
     searchDropdown: { position: 'absolute', top: '100%', left: 0, width: '100%', backgroundColor: 'white', border: '1px solid #eee', borderTop: 'none', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', zIndex: 100, maxHeight: '400px', overflowY: 'auto' },
     cityDropdown: { position: 'absolute', top: '100%', left: 0, width: '100%', backgroundColor: 'white', border: '1px solid #eee', borderTop: 'none', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', zIndex: 100, maxHeight: '300px', overflowY: 'auto' },
@@ -619,7 +624,7 @@ const styles = {
     resultAvatarImg: { width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', marginRight: '12px' },
     resultText: { fontSize: '14px', color: '#333' },
 
-    checkboxContainer: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', width: '100%', maxWidth: '800px', justifyContent: 'flex-end' },
+    checkboxContainer: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', width: '100%', maxWidth: '800px', justifyContent: 'flex-end', boxSizing: 'border-box' },
     checkbox: { accentColor: '#7A33E3' },
     checkboxLabel: { fontSize: '13px', color: '#555' },
 
@@ -651,7 +656,7 @@ const styles = {
     starIcon: { color: '#FFD700', fontSize: '20px' },
     ratingVal: { fontWeight: '700', fontSize: '16px' },
 
-    ctaContainer: { marginTop: '60px', width: '100%', display: 'flex', justifyContent: 'center' },
+    ctaContainer: { marginTop: '60px', width: '100%', display: 'flex', justifyContent: 'center', boxSizing: 'border-box' },
     bigCtaBtn: { backgroundColor: '#7A33E3', color: 'white', padding: '18px 60px', borderRadius: '0px', border: 'none', fontSize: '18px', fontWeight: '600', cursor: 'pointer', width: '100%', maxWidth: '600px' }
 };
 

@@ -70,18 +70,18 @@ const AccordionSection = ({ title, children, defaultOpen = false }) => {
     );
 };
 
-const PriceDetailsPopup = ({ item, onClose }) => {
+const PriceDetailsPopup = ({ item, onClose, isMobile }) => {
     if (!item) return null;
 
     return (
         <div style={styles.popupOverlay} onClick={onClose}>
-            <div style={styles.popupContent} onClick={(e) => e.stopPropagation()}>
+            <div style={{...styles.popupContent, padding: isMobile ? '20px' : '30px'}} onClick={(e) => e.stopPropagation()}>
                 <div style={styles.popupHeader}>
                     <h2 style={{margin: 0, color: '#333', fontSize: '22px'}}>{item.name}</h2>
                     <span className="material-symbols-outlined" style={styles.closeBtn} onClick={onClose}>close</span>
                 </div>
                 
-                <div style={styles.popupGrid}>
+                <div style={{...styles.popupGrid, gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr'}}>
                     <div style={styles.popupItem}>
                         <span className="material-symbols-outlined" style={styles.popupIcon}>payments</span>
                         <div>
@@ -128,7 +128,7 @@ const PriceDetailsPopup = ({ item, onClose }) => {
     );
 };
 
-const ClassDetailsPopup = ({ cls, onClose, rooms, allInstructors, navigate, schoolStyles }) => {
+const ClassDetailsPopup = ({ cls, onClose, rooms, allInstructors, navigate, schoolStyles, isMobile }) => {
     if (!cls) return null;
 
     const getRoomName = (floorId) => {
@@ -167,7 +167,7 @@ const ClassDetailsPopup = ({ cls, onClose, rooms, allInstructors, navigate, scho
 
     return (
         <div style={styles.popupOverlay} onClick={onClose}>
-            <div style={styles.popupContent} onClick={(e) => e.stopPropagation()}>
+            <div style={{...styles.popupContent, padding: isMobile ? '20px' : '30px'}} onClick={(e) => e.stopPropagation()}>
                 <div style={styles.popupHeader}>
                     <h2 style={{margin: 0, color: '#333', fontSize: '24px', fontWeight: '700'}}>
                         {getStyleName()}
@@ -185,7 +185,7 @@ const ClassDetailsPopup = ({ cls, onClose, rooms, allInstructors, navigate, scho
                     )}
                 </div>
 
-                <div style={styles.popupGrid}>
+                <div style={{...styles.popupGrid, gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr'}}>
                     <div style={styles.popupItem}>
                         <span className="material-symbols-outlined" style={styles.popupIcon}>schedule</span>
                         <div>
@@ -313,8 +313,8 @@ const ClassDetailsPopup = ({ cls, onClose, rooms, allInstructors, navigate, scho
 const School = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    
     const { user } = useContext(AuthContext); 
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
     const [school, setSchool] = useState(null);
     const [schedule, setSchedule] = useState([]); 
@@ -331,9 +331,7 @@ const School = () => {
     const [selectedClass, setSelectedClass] = useState(null);
     const [selectedPriceItem, setSelectedPriceItem] = useState(null);
 
-    // NOWE: Stan do śledzenia zepsutych obrazków w galerii
     const [failedGalleryImages, setFailedGalleryImages] = useState(new Set());
-
     const galleryRef = useRef(null);
 
     const daysKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -373,8 +371,13 @@ const School = () => {
     };
 
     useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 768);
+        window.addEventListener('resize', handleResize);
+
         window.scrollTo(0, 0);
         fetchData();
+
+        return () => window.removeEventListener('resize', handleResize);
     }, [id]);
 
     const userHasReviewed = reviews.some(rev => rev.user === user?.user_id);
@@ -402,7 +405,6 @@ const School = () => {
             return;
         }
 
-        // --- WALIDACJA LIMITU ZNAKÓW ZAMIAST OBCINANIA ---
         if (newReviewText.length > 1000) {
             setReviewError(`Twoja opinia jest za długa o ${newReviewText.length - 1000} znaków! Maksimum to 1000.`);
             return;
@@ -489,7 +491,6 @@ const School = () => {
     const hasAnyPrices = school.price_list && school.price_list.length > 0;
     const hasAnyCards = school.accepts_multisport || school.accepts_medicover || school.accepts_fitprofit || school.accepts_pzu_sport;
 
-    // NOWE: Filtrowanie uszkodzonych zdjęć z galerii
     const validGalleryImages = school.images ? school.images.filter(img => !failedGalleryImages.has(img.id)) : [];
 
     return (
@@ -498,21 +499,21 @@ const School = () => {
                  <span className="material-symbols-outlined" style={styles.backArrow} onClick={() => navigate(-1)}>arrow_back_ios</span>
             </div>
 
-            <div style={styles.mainCard}>
-                <div style={styles.topSection}>
-                    <div style={styles.infoColumn}>
+            <div style={{...styles.mainCard, padding: isMobile ? '20px' : '40px'}}>
+                <div style={{...styles.topSection, flexDirection: isMobile ? 'column' : 'row'}}>
+                    <div style={{...styles.infoColumn, flex: isMobile ? 'none' : 1.5, minWidth: isMobile ? '100%' : '400px'}}>
                         <div style={styles.logoRow}>
-                            <div style={styles.logoWrapper}>
+                            <div style={{...styles.logoWrapper, width: isMobile ? '80px' : '120px', height: isMobile ? '80px' : '120px'}}>
                                 <ImageWithFallback 
                                     src={school.logo} 
                                     alt="Logo" 
                                     style={styles.logo} 
-                                    fallback={<div style={styles.placeholderLogo}>{school.name[0]}</div>} 
+                                    fallback={<div style={{...styles.placeholderLogo, fontSize: isMobile ? '30px' : '50px'}}>{school.name[0]}</div>} 
                                 />
                             </div>
                             <div style={{flex: 1}}>
-                                <h2 style={styles.schoolName}>{school.name}</h2>
-                                <StarRating rating={school.average_rating} count={reviews.length} size="20px" />
+                                <h2 style={{...styles.schoolName, fontSize: isMobile ? '24px' : '32px'}}>{school.name}</h2>
+                                <StarRating rating={school.average_rating} count={reviews.length} size={isMobile ? '16px' : '20px'} />
                                 <div style={styles.addressBox}>
                                     <span className="material-symbols-outlined" style={{color: '#7A33E3'}}>location_on</span>
                                     {school.full_address || `${school.street} ${school.build_no}, ${school.city}`}
@@ -520,12 +521,12 @@ const School = () => {
                             </div>
                         </div>
 
-                        <div style={styles.contactGrid}>
-                            {school.website && <a href={school.website} target="_blank" rel="noopener noreferrer" style={styles.contactItemLink}><span className="material-symbols-outlined">language</span> <span style={styles.longLink}>{school.website}</span></a>}
-                            {school.facebook && <a href={school.facebook} target="_blank" rel="noopener noreferrer" style={styles.contactItemLink}><img src={fbIcon} style={{width:'20px'}} alt="fb"/> <span style={styles.longLink}>{school.facebook}</span></a>}
-                            {school.instagram && <a href={school.instagram} target="_blank" rel="noopener noreferrer" style={styles.contactItemLink}><img src={igIcon} style={{width:'20px'}} alt="ig"/> <span style={styles.longLink}>{school.instagram}</span></a>}
-                            {school.email && <div style={styles.contactItemText}><span className="material-symbols-outlined">mail</span> <span style={styles.longLink}>{school.email}</span></div>}
-                            {school.phone && <div style={styles.contactItemText}><span className="material-symbols-outlined">call</span> {school.phone}</div>}
+                        <div style={{...styles.contactGrid, display: isMobile ? 'grid' : 'flex', flexWrap: 'wrap'}}>
+                            {school.website && <a href={school.website} target="_blank" rel="noopener noreferrer" style={{...styles.contactItemLink, maxWidth: isMobile ? '100%' : '48%'}}><span className="material-symbols-outlined">language</span> <span style={styles.longLink}>{school.website}</span></a>}
+                            {school.facebook && <a href={school.facebook} target="_blank" rel="noopener noreferrer" style={{...styles.contactItemLink, maxWidth: isMobile ? '100%' : '48%'}}><img src={fbIcon} style={{width:'20px'}} alt="fb"/> <span style={styles.longLink}>{school.facebook}</span></a>}
+                            {school.instagram && <a href={school.instagram} target="_blank" rel="noopener noreferrer" style={{...styles.contactItemLink, maxWidth: isMobile ? '100%' : '48%'}}><img src={igIcon} style={{width:'20px'}} alt="ig"/> <span style={styles.longLink}>{school.instagram}</span></a>}
+                            {school.email && <div style={{...styles.contactItemText, maxWidth: isMobile ? '100%' : '48%'}}><span className="material-symbols-outlined">mail</span> <span style={styles.longLink}>{school.email}</span></div>}
+                            {school.phone && <div style={{...styles.contactItemText, maxWidth: isMobile ? '100%' : '48%'}}><span className="material-symbols-outlined">call</span> {school.phone}</div>}
                         </div>
 
                         {school.news && (
@@ -535,19 +536,21 @@ const School = () => {
                         )}
                     </div>
 
-                    <div style={styles.galleryColumn}>
+                    <div style={{...styles.galleryColumn, flex: isMobile ? 'none' : 2, minWidth: isMobile ? '100%' : '400px'}}>
                         {validGalleryImages.length > 0 ? (
                             <div style={styles.galleryWrapper}>
-                                <button onClick={() => scrollGallery('left')} style={styles.sliderArrowBtn}>
-                                    <span className="material-symbols-outlined" style={{fontSize: '40px'}}>chevron_left</span>
-                                </button>
+                                {!isMobile && (
+                                    <button onClick={() => scrollGallery('left')} style={styles.sliderArrowBtn}>
+                                        <span className="material-symbols-outlined" style={{fontSize: '40px'}}>chevron_left</span>
+                                    </button>
+                                )}
 
                                 <div ref={galleryRef} style={styles.galleryTrack}>
                                     {validGalleryImages.map((imgObj) => (
                                         <img 
                                             key={imgObj.id} 
                                             src={imgObj.image} 
-                                            style={styles.galleryImg} 
+                                            style={{...styles.galleryImg, width: isMobile ? '80vw' : '450px'}} 
                                             alt="School Gallery" 
                                             onError={() => {
                                                 setFailedGalleryImages(prev => new Set(prev).add(imgObj.id));
@@ -556,9 +559,11 @@ const School = () => {
                                     ))}
                                 </div>
 
-                                <button onClick={() => scrollGallery('right')} style={styles.sliderArrowBtn}>
-                                    <span className="material-symbols-outlined" style={{fontSize: '40px'}}>chevron_right</span>
-                                </button>
+                                {!isMobile && (
+                                    <button onClick={() => scrollGallery('right')} style={styles.sliderArrowBtn}>
+                                        <span className="material-symbols-outlined" style={{fontSize: '40px'}}>chevron_right</span>
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             <div style={styles.noGallery}>Brak zdjęć w galerii</div>
@@ -698,7 +703,7 @@ const School = () => {
                     </div>
                 )}
 
-                <div style={styles.bottomGrid}>
+                <div style={{...styles.bottomGrid, flexDirection: isMobile ? 'column' : 'row'}}>
                     
                     <div style={{flex: 1}}>
                         <AccordionSection title="Cennik" defaultOpen={true}>
@@ -707,12 +712,12 @@ const School = () => {
                                     {school.price_list && school.price_list.map(p => (
                                         <div 
                                             key={p.id} 
-                                            style={{...styles.priceRow, cursor: 'pointer'}} 
+                                            style={{...styles.priceRow, cursor: 'pointer', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '5px' : '0'}} 
                                             onClick={() => setSelectedPriceItem(p)}
                                         >
                                             <div>
                                                 <span style={{fontWeight:'600'}}>{p.name}</span>
-                                                <span style={{fontSize:'13px', color:'#666', marginLeft:'8px'}}>
+                                                <span style={{fontSize:'13px', color:'#666', marginLeft:'8px', display: isMobile ? 'block' : 'inline', marginTop: isMobile ? '4px' : '0'}}>
                                                     {p.entry_type === 'pass' 
                                                     ? `Karnet ${p.entries_per_week ? `(${p.entries_per_week}x w tyg)` : '(Open)'}` 
                                                     : '(1 wejście)'}
@@ -779,7 +784,6 @@ const School = () => {
                                 <div style={styles.reviewInputBox}>
                                     <div style={{marginBottom:'10px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                                         <span style={{fontSize:'14px', fontWeight:'bold'}}>Twoja ocena:</span>
-                                        {/* --- NOWY LICZNIK ZNAKÓW --- */}
                                         <span style={{ 
                                             fontSize: '11px', 
                                             color: newReviewText.length > 1000 ? 'red' : '#888',
@@ -850,6 +854,7 @@ const School = () => {
                     allInstructors={school.instructors}
                     navigate={navigate}
                     onClose={() => setSelectedClass(null)} 
+                    isMobile={isMobile}
                 />
             )}
 
@@ -857,6 +862,7 @@ const School = () => {
                 <PriceDetailsPopup 
                     item={selectedPriceItem} 
                     onClose={() => setSelectedPriceItem(null)} 
+                    isMobile={isMobile}
                 />
             )}
         </div>
@@ -865,37 +871,50 @@ const School = () => {
 
 
 const styles = {
-    container: { backgroundColor: '#F8F9FF', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingBottom: '60px', fontFamily: "'Inter', sans-serif" },
+    container: { backgroundColor: '#F8F9FF', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingBottom: '60px', fontFamily: "'Inter', sans-serif", overflowX: 'hidden' },
     loading: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#555' },
-    backButtonWrapper: { width: '100%', maxWidth: '1200px', display: 'flex', justifyContent: 'flex-start', padding: '30px 20px 10px 20px' },
+    backButtonWrapper: { width: '100%', maxWidth: '1200px', display: 'flex', justifyContent: 'flex-start', padding: '30px 20px 10px 20px', boxSizing: 'border-box' },
     backArrow: { fontSize: '32px', cursor: 'pointer', color: '#333', fontWeight: 'bold' },
-    mainCard: { width: '100%', maxWidth: '1200px', backgroundColor: 'white', borderRadius: '24px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' },
-    topSection: { display: 'flex', gap: '40px', marginBottom: '40px', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' },
-    infoColumn: { flex: 1.5, minWidth: '400px' },
-    galleryColumn: { flex: 2, minWidth: '400px' }, 
-    logoRow: { display: 'flex', gap: '25px', alignItems: 'center', marginBottom: '25px' },
-    logoWrapper: { width: '120px', height: '120px', borderRadius: '50%', backgroundColor: 'white', border: '1px solid #eee', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' },
+    
+    mainCard: { width: '100%', maxWidth: '1200px', backgroundColor: 'white', borderRadius: 'clamp(12px, 4vw, 24px)', padding: 'clamp(20px, 5vw, 40px)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', boxSizing: 'border-box' },
+    
+    topSection: { display: 'flex', gap: 'clamp(20px, 4vw, 40px)', marginBottom: '40px', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' },
+    
+    infoColumn: { flex: '1 1 300px' },
+    galleryColumn: { flex: '1 1 300px', maxWidth: '100%', overflow: 'hidden' }, 
+    
+    logoRow: { display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap' },
+    logoWrapper: { width: 'clamp(80px, 15vw, 120px)', height: 'clamp(80px, 15vw, 120px)', borderRadius: '50%', backgroundColor: 'white', border: '1px solid #eee', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', flexShrink: 0 },
     logo: { width: '100%', height: '100%', objectFit: 'cover' }, 
-    placeholderLogo: { width: '100%', height: '100%', backgroundColor: '#eee', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '50px', color: '#888', fontWeight: 'bold' },
-    schoolName: { fontSize: '32px', fontWeight: '800', color: '#333', margin: '0 0 10px 0', lineHeight: 1.1 },
-    addressBox: { display: 'flex', alignItems: 'center', gap: '8px', color: '#555', marginTop: '10px', fontSize: '15px' },
-    contactGrid: { display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '20px' },
-    contactItemLink: { display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: '#333', fontSize: '13px', padding: '8px 12px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #eee', transition: '0.2s', fontWeight: '500', maxWidth: '48%', cursor: 'pointer' },
-    contactItemText: { display: 'flex', alignItems: 'center', gap: '8px', color: '#555', fontSize: '13px', padding: '8px 12px', backgroundColor: '#f9f9f9', borderRadius: '8px', border: '1px solid #eee', fontWeight: '500', maxWidth: '48%' },
+    placeholderLogo: { width: '100%', height: '100%', backgroundColor: '#eee', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 'clamp(30px, 8vw, 50px)', color: '#888', fontWeight: 'bold' },
+    schoolName: { fontSize: 'clamp(24px, 6vw, 32px)', fontWeight: '800', color: '#333', margin: '0 0 10px 0', lineHeight: 1.1 },
+    
+    // ZMIANA: wyrównanie flex-start (żeby pinezka nie zjechała na dół) i keep-all (żeby kod pocztowy się nie łamał)
+    addressBox: { display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#555', marginTop: '10px', fontSize: '15px', lineHeight: '1.4', wordBreak: 'keep-all' },
+    
+    contactGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', marginTop: '20px' },
+    contactItemLink: { display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: '#333', fontSize: '13px', padding: '8px 12px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #eee', transition: '0.2s', fontWeight: '500', cursor: 'pointer', boxSizing: 'border-box' },
+    contactItemText: { display: 'flex', alignItems: 'center', gap: '8px', color: '#555', fontSize: '13px', padding: '8px 12px', backgroundColor: '#f9f9f9', borderRadius: '8px', border: '1px solid #eee', fontWeight: '500', boxSizing: 'border-box' },
     longLink: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px', display: 'inline-block', verticalAlign: 'middle' },
-    newsBox: { marginTop: '25px', padding: '15px', backgroundColor: '#fff0f0', borderLeft: '4px solid #d32f2f', borderRadius: '6px', color: '#d32f2f', fontSize: '14px', lineHeight: '1.5' },
-    galleryWrapper: { display: 'flex', alignItems: 'center', gap: '10px' },
+    
+    // ZMIANA: Dodano marginBottom
+    newsBox: { marginTop: '25px', marginBottom: '25px', padding: '15px', backgroundColor: '#fff0f0', borderLeft: '4px solid #d32f2f', borderRadius: '6px', color: '#d32f2f', fontSize: '14px', lineHeight: '1.5' },
+    
+    galleryWrapper: { display: 'flex', alignItems: 'center', gap: '10px', width: '100%' },
     galleryTrack: { display: 'flex', overflowX: 'auto', gap: '15px', paddingBottom: '10px', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', width: '100%' },
-    galleryImg: { width: '450px', height: '280px', borderRadius: '12px', objectFit: 'cover', scrollSnapAlign: 'center', border: '1px solid #eee', flexShrink: 0 },
+    
+    // ZMIANA: Zamiast sztywnych px czy problematycznych vw, teraz procenty i clamp bezpiecznie dopasują zdjęcie
+    galleryImg: { flex: '0 0 clamp(250px, 85%, 450px)', height: 'clamp(200px, 50vw, 280px)', borderRadius: '12px', objectFit: 'cover', scrollSnapAlign: 'center', border: '1px solid #eee' },
+    
     noGallery: { width: '100%', height: '250px', backgroundColor: '#f9f9f9', borderRadius: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#888' },
     sliderArrowBtn: { background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s' },
     separator: { width: '100%', height: '1px', backgroundColor: '#e0e0e0', margin: '40px 0' },
     sectionContainer: { marginBottom: '40px' },
     sectionHeaderPurple: { fontSize: '24px', fontWeight: '800', color: '#7A33E3', marginBottom: '20px' },
-    roomTabs: { display: 'flex', gap: '10px', marginBottom: '20px' },
-    roomTab: { padding: '10px 20px', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: '0.2s' },
+    roomTabs: { display: 'flex', gap: '10px', marginBottom: '20px', overflowX: 'auto', paddingBottom: '10px' },
+    roomTab: { padding: '10px 20px', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: '0.2s', whiteSpace: 'nowrap' },
     scheduleGridWrapper: { overflowX: 'auto', paddingBottom: '10px' },
-    scheduleGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '10px', minWidth: '1000px' },
+    scheduleGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '10px', minWidth: '900px' },
     dayColumn: { backgroundColor: '#EAEAEA', borderRadius: '10px', padding: '10px', minHeight: '300px' },
     dayHeader: { textAlign: 'center', fontWeight: '800', color: '#7A33E3', marginBottom: '15px', fontSize: '13px' },
     dayContent: { display: 'flex', flexDirection: 'column', gap: '10px' },
@@ -915,8 +934,10 @@ const styles = {
     instAvatar: { width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', marginBottom: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
     instPlaceholder: { width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '30px', color: '#888', marginBottom: '10px' },
     instName: { fontWeight: '600', textAlign: 'center', color: '#333' },
-    bottomGrid: { display: 'flex', gap: '50px', flexWrap: 'wrap', alignItems: 'flex-start' },
-    priceRow: { display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px dashed #eee' },
+    
+    bottomGrid: { display: 'flex', gap: 'clamp(20px, 5vw, 50px)', flexWrap: 'wrap', alignItems: 'flex-start' },
+    
+    priceRow: { display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px dashed #eee', flexWrap: 'wrap', gap: '10px' },
     cardBadge: { backgroundColor: '#7A33E3', color: 'white', fontSize: '11px', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold' },
     registrationBox: { marginTop: '15px', padding: '15px', backgroundColor: 'rgba(122, 51, 227, 0.1)', borderRadius: '8px', fontSize: '14px', border: '1px solid rgba(122, 51, 227, 0.2)' },
     reviewInputBox: { backgroundColor: '#F9F9F9', padding: '20px', borderRadius: '12px', marginBottom: '30px' },
@@ -926,11 +947,13 @@ const styles = {
     alreadyReviewedBox: { marginBottom: '20px', padding: '20px', backgroundColor: '#E8F5E9', borderRadius: '12px', color: '#2E7D32', fontSize: '14px', border: '1px solid #C8E6C9', display: 'flex', alignItems: 'center', gap: '15px' },
     reviewsList: { display: 'flex', flexDirection: 'column', gap: '20px' },
     reviewItem: { backgroundColor: '#F9F9F9', padding: '20px', borderRadius: '12px' },
-    popupOverlay: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center' },
-    popupContent: { backgroundColor: 'white', borderRadius: '16px', padding: '30px', width: '90%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' },
+    popupOverlay: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px', boxSizing: 'border-box' },
+    popupContent: { backgroundColor: 'white', borderRadius: '16px', padding: 'clamp(15px, 5vw, 30px)', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.2)', boxSizing: 'border-box' },
     popupHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '15px' },
     closeBtn: { cursor: 'pointer', fontSize: '28px', color: '#999' },
-    popupGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' },
+    
+    popupGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '20px' },
+    
     popupItem: { display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '15px' },
     popupIcon: { color: '#7A33E3', fontSize: '24px' },
     popupActionBtn: { backgroundColor: '#333', color: 'white', border: 'none', padding: '12px 40px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px' },

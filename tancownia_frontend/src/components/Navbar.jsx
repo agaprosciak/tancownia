@@ -9,6 +9,15 @@ const Navbar = () => {
     const [isRegOpen, setIsRegOpen] = useState(false);
     const [isUserOpen, setIsUserOpen] = useState(false);
 
+    // NOWE: Stan do wykrywania urządzeń mobilnych
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     const isOwner = user?.role === 'owner';
     const manageLabel = isOwner ? "Zarządzaj szkołą" : "Zarządzaj profilem";
     const destinationPath = "/profile";
@@ -19,19 +28,19 @@ const Navbar = () => {
     };
 
     return (
-        <nav style={styles.nav}>
-            <Link to="/" style={styles.logoLink}>
-                <img src={logotyp} alt="Ikona" style={styles.logoIcon} />
-                <img src={logonazwa} alt="Tańcownia" style={styles.logoName} />
+        <nav style={{ ...styles.nav, padding: isMobile ? '0 15px' : '0 60px' }}>
+            <Link to="/" style={{ ...styles.logoLink, flexShrink: 0 }}>
+                <img src={logotyp} alt="Ikona" style={{ ...styles.logoIcon, height: isMobile ? '40px' : '55px' }} />
+                <img src={logonazwa} alt="Tańcownia" style={{ ...styles.logoName, height: isMobile ? '16px' : '22px' }} />
             </Link>
             
-            <div style={styles.rightMenu}>
+            <div style={{ ...styles.rightMenu, gap: isMobile ? '15px' : '35px' }}>
                 {!user ? (
                     <>
                         <div style={styles.dropdownContainer}>
-                            <div style={styles.navItem} onClick={() => setIsRegOpen(!isRegOpen)}>
+                            <div style={{ ...styles.navItem, fontSize: isMobile ? '13px' : '17px', whiteSpace: 'nowrap' }} onClick={() => setIsRegOpen(!isRegOpen)}>
                                 Zarejestruj się 
-                                <span className="material-symbols-outlined" style={styles.icon}>
+                                <span className="material-symbols-outlined" style={{ ...styles.icon, fontSize: isMobile ? '18px' : '22px' }}>
                                     {isRegOpen ? 'keyboard_control_key' : 'keyboard_arrow_down'}
                                 </span>
                             </div>
@@ -42,13 +51,13 @@ const Navbar = () => {
                                 </div>
                             )}
                         </div>
-                        <Link to="/login" style={styles.navItem}>Zaloguj się</Link>
+                        <Link to="/login" style={{ ...styles.navItem, fontSize: isMobile ? '13px' : '17px', whiteSpace: 'nowrap' }}>Zaloguj się</Link>
                     </>
                 ) : (
                     <div style={styles.dropdownContainer}>
-                        <div style={styles.navItem} onClick={() => setIsUserOpen(!isUserOpen)}>
+                        <div style={{ ...styles.navItem, fontSize: isMobile ? '13px' : '17px', whiteSpace: 'nowrap' }} onClick={() => setIsUserOpen(!isUserOpen)}>
                             {user.username || "Użytkownik"} 
-                            <span className="material-symbols-outlined" style={styles.icon}>
+                            <span className="material-symbols-outlined" style={{ ...styles.icon, fontSize: isMobile ? '18px' : '22px' }}>
                                 {isUserOpen ? 'keyboard_control_key' : 'keyboard_arrow_down'}
                             </span>
                         </div>
@@ -57,7 +66,6 @@ const Navbar = () => {
                                 <Link to={destinationPath} style={styles.dropItem} onClick={() => setIsUserOpen(false)}>
                                     {manageLabel}
                                 </Link>
-                                {/* TU ZMIANA: używamy handleLogout zamiast samego logoutUser */}
                                 <div style={styles.dropItem} onClick={handleLogout}>
                                     Wyloguj się
                                 </div>

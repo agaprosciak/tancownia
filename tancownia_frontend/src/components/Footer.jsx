@@ -7,19 +7,25 @@ const Footer = () => {
         <footer style={styles.footer}>
             <div style={styles.container}>
                 
-                {/* SEKCJA LEWA: Logotyp + Nazwa, Opis, Kontakt */}
+                {/* SEKCJA LEWA: Logotyp + Nazwa, Kontakt */}
                 <div style={styles.brandSection}>
-                    {/* Kontener na oba loga obok siebie */}
                     <div style={styles.logoRow}>
                         <img src={logotyp} alt="Logo" style={styles.logoIcon} />
                         <img src={logoNazwa} alt="DanceApp" style={styles.logoText} />
                     </div>
-
                     <p style={styles.tagline}>
                         Platforma do wyszukiwania szkół tańca i zajęć w całej Polsce.
                     </p>
-                    <a style={styles.email}>
+                    <a href="mailto:kontakt@tancownia.pl" style={styles.authorEmail}>
                         kontakt@tancownia.pl
+                    </a>
+                </div>
+
+                {/* SEKCJA ŚRODKOWA: Autorka */}
+                <div style={styles.authorSection}>
+                    <div style={styles.authorTitle}>Autorka: Agnieszka Prościak</div>
+                    <a href="mailto:agnprosciak@gmail.com" style={styles.email}>
+                        agnprosciak@gmail.com
                     </a>
                 </div>
 
@@ -65,7 +71,7 @@ const styles = {
         flexDirection: 'column',
         alignItems: 'flex-start',
         gap: '12px',
-        maxWidth: '450px'
+        flex: '1 1 300px' // Pozwala sekcji rosnąć i zwijać się
     },
     logoRow: {
         display: 'flex',
@@ -91,13 +97,34 @@ const styles = {
         color: '#7A33E3',
         textDecoration: 'none',
         fontWeight: '600',
+        fontSize: '13px',
+        cursor: 'pointer'
+    },
+    authorSection: {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        textAlign: 'center',
+        gap: '4px',
+        flex: '1 1 200px'
+    },
+    authorTitle: {
+        fontWeight: '500',
+        color: '#555',
         fontSize: '13px'
+    },
+    authorEmail: {
+        color: '#7A33E3',
+        textDecoration: 'none',
+        fontSize: '12px',
+        fontWeight: '500'
     },
     linksSection: {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-end',
-        gap: '10px'
+        gap: '10px',
+        flex: '1 1 300px'
     },
     legalLinks: {
         display: 'flex',

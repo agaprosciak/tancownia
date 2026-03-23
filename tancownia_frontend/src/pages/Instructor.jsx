@@ -17,6 +17,7 @@ const Instructor = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        window.scrollTo(0, 0);
         const fetchInstructor = async () => {
             try {
                 const res = await api.get(`instructors/${id}/`);
@@ -152,6 +153,7 @@ const styles = {
         alignItems: 'center',
         marginBottom: '30px',
         padding: '0 20px',
+        boxSizing: 'border-box', // ZMIANA: Zabezpiecza padding przed wyjściem za ramy
     },
     backButton: {
         cursor: 'pointer',
@@ -160,62 +162,72 @@ const styles = {
         alignItems: 'center',
     },
     pageTitle: {
-        fontSize: '24px',
+        fontSize: 'clamp(18px, 5vw, 24px)', // ZMIANA: Zmniejsza się na telefonie
         fontWeight: '400',
         color: '#000',
         margin: 0,
+        textAlign: 'center',
     },
     card: {
         backgroundColor: 'white',
         width: '100%',
         maxWidth: '900px',
-        padding: '50px',
+        padding: 'clamp(20px, 5vw, 50px)', // ZMIANA: Zmniejsza padding na mobile
         display: 'flex',
         flexDirection: 'row',
+        flexWrap: 'wrap', // KLUCZOWA ZMIANA: Zdjęcie i tekst ułożą się jedno pod drugim na telefonie
         alignItems: 'center',
-        gap: '50px',
+        justifyContent: 'center', // ZMIANA: Gdy się zawinie, wycentruje zawartość
+        gap: 'clamp(20px, 4vw, 50px)', // ZMIANA: Płynny odstęp
         boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
         borderRadius: '4px',
+        boxSizing: 'border-box',
     },
     imageSection: {
         flexShrink: 0,
+        display: 'flex',
+        justifyContent: 'center', // ZMIANA: Centrowanie awatara
     },
     avatar: {
-        width: '200px',
-        height: '200px',
+        width: 'clamp(120px, 40vw, 200px)', // ZMIANA: Zmniejszy się na małym ekranie
+        height: 'clamp(120px, 40vw, 200px)',
         borderRadius: '50%',
         objectFit: 'cover',
         border: '1px solid #eee',
     },
     placeholderAvatar: {
-        width: '200px',
-        height: '200px',
+        width: 'clamp(120px, 40vw, 200px)',
+        height: 'clamp(120px, 40vw, 200px)',
         borderRadius: '50%',
         backgroundColor: '#eee',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: '60px',
+        fontSize: 'clamp(40px, 10vw, 60px)',
         color: '#888',
         fontWeight: 'bold',
     },
     infoSection: {
-        flex: 1,
+        flex: '1 1 300px', // ZMIANA: Flexbox zajmie resztę miejsca, ale jak ekran ma mniej niż 300px, zrzuci tekst pod zdjęcie
         display: 'flex',
         flexDirection: 'column',
         gap: '15px',
+        alignItems: 'flex-start', // Domyślnie do lewej...
     },
     nameRow: {
         display: 'flex',
         alignItems: 'center',
         gap: '20px',
         marginBottom: '10px',
+        flexWrap: 'wrap', // ZMIANA: Ikonki sociali uciekną pod imię, jeśli brakuje miejsca
+        justifyContent: 'center',
     },
     name: {
-        fontSize: '28px',
+        fontSize: 'clamp(22px, 6vw, 28px)', // ZMIANA: Płynne skalowanie fontu
         fontWeight: '700',
         color: '#7A33E3',
         margin: 0,
+        textAlign: 'center',
     },
     socialIcons: {
         display: 'flex',
@@ -233,7 +245,7 @@ const styles = {
         display: 'flex',
         alignItems: 'flex-start',
         gap: '12px',
-        fontSize: '16px',
+        fontSize: 'clamp(14px, 3vw, 16px)', // ZMIANA: Płynne skalowanie tekstu
         color: '#333',
         lineHeight: '1.5',
     },
@@ -245,6 +257,7 @@ const styles = {
     detailLabel: {
         color: '#555',
         fontWeight: '400',
+        whiteSpace: 'nowrap', // ZMIANA: "Uczy w:" lub "Style:" nie będą łamać się w połowie
     },
     detailValue: {
         fontWeight: '600',
