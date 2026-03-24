@@ -5,9 +5,13 @@ Aplikacja webowa do publikowania ofert zajęć tanecznych
 
 🌐 **https://tancownia.vercel.app/**
 
-<img src="https://github.com/user-attachments/assets/9333ac44-394c-46ba-bb18-8d4c0bbe64be" width="300" alt="Screen z telefonu">
-
-<img width="1142" height="872" alt="Zrzut ekranu 2026-03-24 143057" src="https://github.com/user-attachments/assets/64ebd869-c891-4739-b377-e9c3a3bce328" />
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/9333ac44-394c-46ba-bb18-8d4c0bbe64be" width="500" alt="Screen z telefonu - Strona Główna">
+</div>
+<br><br>
+<div align="center">
+  <img width="1142" height="872" alt="Zrzut ekranu 2026-03-24 143057" src="https://github.com/user-attachments/assets/64ebd869-c891-4739-b377-e9c3a3bce328" />
+</div>
 
 ## Główne funkcjonalności
 * **Zaawansowana wyszukiwarka i filtry:** Wyszukiwanie szkół i zajęć po stylu tańca, poziomie zaawansowania, wieku, dniu tygodnia czy akceptowanych kartach partnerskich (MultiSport, Medicover itp.).
